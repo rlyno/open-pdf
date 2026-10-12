@@ -4,6 +4,7 @@
  * in plain Node as well as on device.
  */
 import {
+  LineCapStyle,
   PDFDocument,
   PDFFont,
   PDFPage,
@@ -12,6 +13,8 @@ import {
   rgb,
   type SecurityOptions,
 } from '@cantoo/pdf-lib';
+
+import { t } from '../i18n';
 
 export type Bytes = Uint8Array;
 
@@ -24,7 +27,7 @@ export async function loadPdf(bytes: Bytes, password?: string): Promise<PDFDocum
   try {
     const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
     if (doc.isEncrypted && !password) {
-      throw new PdfToolError('PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".');
+      throw new PdfToolError(t('PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".'));
     }
     return doc;
   } catch (e) {
@@ -32,10 +35,12 @@ export async function loadPdf(bytes: Bytes, password?: string): Promise<PDFDocum
     const msg = String((e as Error)?.message ?? e);
     if (/encrypt|password/i.test(msg)) {
       throw new PdfToolError(
-        password ? 'Password salah atau tidak didukung.' : 'PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".'
+        password
+          ? t('Password salah atau tidak didukung.')
+          : t('PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".')
       );
     }
-    throw new PdfToolError(`File bukan PDF yang valid: ${msg}`);
+    throw new PdfToolError(t('File bukan PDF yang valid: {msg}', { msg }));
   }
 }
 
@@ -56,7 +61,7 @@ async function save(doc: PDFDocument, useObjectStreams = true): Promise<Bytes> {
 export function parsePageRanges(input: string, pageCount: number): number[] {
   const out: number[] = [];
   const parts = input.split(/[,;\s]+/).filter(Boolean);
-  if (parts.length === 0) throw new PdfToolError('Masukkan nomor halaman, contoh: 1-3,5');
+  if (parts.length === 0) throw new PdfToolError(t('Masukkan nomor halaman, contoh: 1-3,5'));
   for (const part of parts) {
     const m = /^(\d*)\s*-\s*(\d*)$/.exec(part);
     let from: number;
@@ -67,10 +72,10 @@ export function parsePageRanges(input: string, pageCount: number): number[] {
     } else if (/^\d+$/.test(part)) {
       from = to = parseInt(part, 10);
     } else {
-      throw new PdfToolError(`Rentang tidak valid: "${part}"`);
+      throw new PdfToolError(t('Rentang tidak valid: "{part}"', { part }));
     }
     if (from < 1 || to < 1 || from > pageCount || to > pageCount) {
-      throw new PdfToolError(`Halaman "${part}" di luar jangkauan (1–${pageCount}).`);
+      throw new PdfToolError(t('Halaman "{part}" di luar jangkauan (1–{max}).', { part, max: pageCount }));
     }
     const step = from <= to ? 1 : -1;
     for (let p = from; p !== to + step; p += step) out.push(p - 1);
@@ -167,7 +172,7 @@ export async function setMetadata(bytes: Bytes, meta: Metadata): Promise<Bytes> 
 // ---------------------------------------------------------------------------
 
 export async function merge(files: Bytes[]): Promise<Bytes> {
-  if (files.length < 2) throw new PdfToolError('Pilih minimal 2 file PDF.');
+  if (files.length < 2) throw new PdfToolError(t('Pilih minimal 2 file PDF.'));
   const out = await PDFDocument.create();
   for (const bytes of files) {
     const src = await loadPdf(bytes);
@@ -179,7 +184,7 @@ export async function merge(files: Bytes[]): Promise<Bytes> {
 
 /** Builds a new document containing `indices` (0-based, in that order). */
 export async function selectPages(bytes: Bytes, indices: number[]): Promise<Bytes> {
-  if (indices.length === 0) throw new PdfToolError('Tidak ada halaman yang dipilih.');
+  if (indices.length === 0) throw new PdfToolError(t('Tidak ada halaman yang dipilih.'));
   const src = await loadPdf(bytes);
   return save(await copyInto(src, indices));
 }
@@ -199,8 +204,8 @@ export async function removePages(bytes: Bytes, remove: number[]): Promise<Bytes
   const src = await loadPdf(bytes);
   const drop = new Set(remove);
   const keep = src.getPageIndices().filter((i) => !drop.has(i));
-  if (keep.length === 0) throw new PdfToolError('Tidak bisa menghapus semua halaman.');
-  if (keep.length === src.getPageCount()) throw new PdfToolError('Pilih halaman yang ingin dihapus.');
+  if (keep.length === 0) throw new PdfToolError(t('Tidak bisa menghapus semua halaman.'));
+  if (keep.length === src.getPageCount()) throw new PdfToolError(t('Pilih halaman yang ingin dihapus.'));
   return save(await copyInto(src, keep));
 }
 
@@ -210,12 +215,12 @@ export async function splitIntoGroups(bytes: Bytes, groups: number[][]): Promise
   for (const g of groups) {
     if (g.length) out.push(await save(await copyInto(src, g)));
   }
-  if (out.length === 0) throw new PdfToolError('Tidak ada halaman untuk dipisah.');
+  if (out.length === 0) throw new PdfToolError(t('Tidak ada halaman untuk dipisah.'));
   return out;
 }
 
 export async function splitEvery(bytes: Bytes, n: number): Promise<Bytes[]> {
-  if (!Number.isInteger(n) || n < 1) throw new PdfToolError('Jumlah halaman per file harus ≥ 1.');
+  if (!Number.isInteger(n) || n < 1) throw new PdfToolError(t('Jumlah halaman per file harus ≥ 1.'));
   const src = await loadPdf(bytes);
   const groups: number[][] = [];
   const all = src.getPageIndices();
@@ -227,10 +232,10 @@ export async function splitEvery(bytes: Bytes, n: number): Promise<Bytes[]> {
 
 /** Rotates the given pages (all when omitted) by a multiple of 90°. */
 export async function rotate(bytes: Bytes, angle: number, pageIndices?: number[]): Promise<Bytes> {
-  if (angle % 90 !== 0) throw new PdfToolError('Sudut rotasi harus kelipatan 90°.');
+  if (angle % 90 !== 0) throw new PdfToolError(t('Sudut rotasi harus kelipatan 90°.'));
   const doc = await loadPdf(bytes);
   const targets = pageIndices ?? doc.getPageIndices();
-  if (targets.length === 0) throw new PdfToolError('Pilih halaman yang ingin diputar.');
+  if (targets.length === 0) throw new PdfToolError(t('Pilih halaman yang ingin diputar.'));
   for (const i of targets) {
     const page = doc.getPage(i);
     const next = (((page.getRotation().angle + angle) % 360) + 360) % 360;
@@ -283,7 +288,7 @@ export type ImagesToPdfOptions = {
 const PAGE_SIZES = { A4: [595.28, 841.89], Letter: [612, 792] } as const;
 
 export async function imagesToPdf(images: ImageInput[], opts: ImagesToPdfOptions): Promise<Bytes> {
-  if (images.length === 0) throw new PdfToolError('Pilih minimal 1 gambar.');
+  if (images.length === 0) throw new PdfToolError(t('Pilih minimal 1 gambar.'));
   const doc = await PDFDocument.create();
   for (const img of images) {
     const embedded = img.kind === 'png' ? await doc.embedPng(img.bytes) : await doc.embedJpg(img.bytes);
@@ -411,7 +416,7 @@ function assertEncodable(font: PDFFont, text: string) {
   const supported = new Set(font.getCharacterSet());
   const bad = [...text].find((ch) => ch.trim() && !supported.has(ch.codePointAt(0)!));
   if (bad) {
-    throw new PdfToolError(`Karakter "${bad}" belum didukung. Gunakan huruf Latin.`);
+    throw new PdfToolError(t('Karakter "{char}" belum didukung. Gunakan huruf Latin.', { char: bad }));
   }
 }
 
@@ -434,7 +439,7 @@ export type WatermarkOptions = {
 
 export async function addTextWatermark(bytes: Bytes, o: WatermarkOptions): Promise<Bytes> {
   const text = o.text.trim();
-  if (!text) throw new PdfToolError('Isi teks watermark.');
+  if (!text) throw new PdfToolError(t('Isi teks watermark.'));
   const doc = await loadPdf(bytes);
   const font = await doc.embedFont(StandardFonts.HelveticaBold);
   assertEncodable(font, text);
@@ -508,7 +513,7 @@ export async function addPageNumbers(bytes: Bytes, o: PageNumberOptions): Promis
 export async function flattenForm(bytes: Bytes): Promise<Bytes> {
   const doc = await loadPdf(bytes);
   const form = doc.getForm();
-  if (form.getFields().length === 0) throw new PdfToolError('PDF ini tidak memiliki formulir.');
+  if (form.getFields().length === 0) throw new PdfToolError(t('PDF ini tidak memiliki formulir.'));
   form.flatten();
   return save(doc);
 }
@@ -541,6 +546,82 @@ export async function stampImage(bytes: Bytes, o: StampOptions): Promise<Bytes> 
   return save(doc);
 }
 
+export type Point = { x: number; y: number };
+
+/** A hand-drawn signature, normalised to its own bounding box. */
+export type DrawnPath = { d: string; width: number; height: number };
+
+/**
+ * Turns touch strokes into one SVG path cropped to the strokes' bounds.
+ * Midpoint quadratic curves smooth the jitter of raw touch samples.
+ */
+export function strokesToPath(strokes: Point[][], padding = 4): DrawnPath | null {
+  const pts = strokes.flat();
+  if (pts.length === 0) return null;
+  const minX = Math.min(...pts.map((p) => p.x)) - padding;
+  const minY = Math.min(...pts.map((p) => p.y)) - padding;
+  const maxX = Math.max(...pts.map((p) => p.x)) + padding;
+  const maxY = Math.max(...pts.map((p) => p.y)) + padding;
+  const f = (n: number) => Math.round(n * 10) / 10;
+  const parts: string[] = [];
+  for (const stroke of strokes) {
+    if (stroke.length === 0) continue;
+    const p = stroke.map((q) => ({ x: q.x - minX, y: q.y - minY }));
+    parts.push(`M${f(p[0].x)} ${f(p[0].y)}`);
+    if (p.length === 1) {
+      // A tap: draw a dot so it still shows up.
+      parts.push(`L${f(p[0].x + 0.1)} ${f(p[0].y)}`);
+      continue;
+    }
+    for (let i = 1; i < p.length - 1; i++) {
+      const mx = (p[i].x + p[i + 1].x) / 2;
+      const my = (p[i].y + p[i + 1].y) / 2;
+      parts.push(`Q${f(p[i].x)} ${f(p[i].y)} ${f(mx)} ${f(my)}`);
+    }
+    const last = p[p.length - 1];
+    parts.push(`L${f(last.x)} ${f(last.y)}`);
+  }
+  return { d: parts.join(' '), width: maxX - minX, height: maxY - minY };
+}
+
+export type PathStampOptions = {
+  path: DrawnPath;
+  /** Stroke width in path units (the drawing canvas's points). */
+  strokeWidth: number;
+  color: string;
+  pageIndex: number;
+  cx: number;
+  cy: number;
+  widthFraction: number;
+};
+
+/** Draws a signature as vector strokes, so it stays sharp at any zoom. */
+export async function stampPath(bytes: Bytes, o: PathStampOptions): Promise<Bytes> {
+  const doc = await loadPdf(bytes);
+  const page = doc.getPage(o.pageIndex);
+  const f = frameOf(page);
+  const w = f.width * o.widthFraction;
+  const scale = w / o.path.width;
+  const h = o.path.height * scale;
+  // drawSvgPath's origin is the path's top-left corner, with y pointing down.
+  const { x, y } = f.toUser(f.width * o.cx - w / 2, f.height * (1 - o.cy) + h / 2);
+  page.drawSvgPath(o.path.d, {
+    x,
+    y,
+    scale,
+    rotate: degrees(f.rotation),
+    borderColor: rgb(...rgbTuple(o.color)),
+    borderWidth: o.strokeWidth,
+    borderLineCap: LineCapStyle.Round,
+  });
+  return save(doc);
+}
+
+function rgbTuple(hex: string): [number, number, number] {
+  const c = hexToRgb(hex);
+  return [c.r, c.g, c.b];
+}
+
 // ---------------------------------------------------------------------------
 // Security
 // ---------------------------------------------------------------------------
@@ -560,7 +641,7 @@ function randomPassword(): string {
 }
 
 export async function protect(bytes: Bytes, o: ProtectOptions): Promise<Bytes> {
-  if (!o.userPassword) throw new PdfToolError('Isi password.');
+  if (!o.userPassword) throw new PdfToolError(t('Isi password.'));
   const doc = await loadPdf(bytes);
   const options: SecurityOptions = {
     userPassword: o.userPassword,

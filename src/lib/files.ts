@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
+import { t } from '@/lib/i18n';
 import type { ImageInput } from '@/lib/pdf/ops';
 
 export type PickedFile = { uri: string; name: string; size: number };
@@ -33,9 +34,9 @@ export async function readBytes(uri: string): Promise<Uint8Array> {
   return new File(uri).bytes();
 }
 
-/** Picks images and normalises them to JPEG/PNG that pdf-lib can embed. */
 export type PickedImage = ImageInput & { uri: string; name: string; width: number; height: number };
 
+/** Picks images and normalises them to JPEG/PNG that pdf-lib can embed. */
 export async function pickImages(opts: { multiple: boolean; maxSide?: number }): Promise<PickedImage[]> {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
@@ -44,32 +45,71 @@ export async function pickImages(opts: { multiple: boolean; maxSide?: number }):
     quality: 1,
   });
   if (res.canceled) return [];
-  const maxSide = opts.maxSide ?? 2400;
   const out: PickedImage[] = [];
-  for (const asset of res.assets) {
-    // Keep PNG so transparent signatures stay transparent; everything else
-    // (HEIC, WebP, ...) becomes JPEG.
-    const isPng = asset.mimeType === 'image/png' || /\.png$/i.test(asset.fileName ?? asset.uri);
-    const ctx = ImageManipulator.manipulate(asset.uri);
-    const longest = Math.max(asset.width, asset.height);
-    if (longest > maxSide) {
-      ctx.resize(asset.width >= asset.height ? { width: maxSide } : { height: maxSide });
-    }
-    const rendered = await ctx.renderAsync();
-    const saved = await rendered.saveAsync({
-      format: isPng ? SaveFormat.PNG : SaveFormat.JPEG,
-      compress: 0.9,
-    });
-    out.push({
-      uri: saved.uri,
-      name: asset.fileName ?? 'gambar',
-      kind: isPng ? 'png' : 'jpg',
-      width: saved.width,
-      height: saved.height,
-      bytes: await readBytes(saved.uri),
-    });
+  for (const a of res.assets) {
+    out.push(await normalizeImage(a.uri, a.fileName ?? 'gambar', a.mimeType, opts.maxSide));
   }
   return out;
+}
+
+/**
+ * Re-encodes any image the OS can decode (HEIC, WebP, ...) as JPEG, keeping
+ * PNG so transparent signatures stay transparent, and caps its longest side.
+ */
+export async function normalizeImage(
+  uri: string,
+  name: string,
+  mimeType?: string | null,
+  maxSide = 2400
+): Promise<PickedImage> {
+  const isPng = mimeType === 'image/png' || /\.png$/i.test(name || uri);
+  let image = await ImageManipulator.manipulate(uri).renderAsync();
+  if (Math.max(image.width, image.height) > maxSide) {
+    const ctx = ImageManipulator.manipulate(image);
+    ctx.resize(image.width >= image.height ? { width: maxSide } : { height: maxSide });
+    image = await ctx.renderAsync();
+  }
+  const saved = await image.saveAsync({ format: isPng ? SaveFormat.PNG : SaveFormat.JPEG, compress: 0.9 });
+  return {
+    uri: saved.uri,
+    name,
+    kind: isPng ? 'png' : 'jpg',
+    width: saved.width,
+    height: saved.height,
+    bytes: await readBytes(saved.uri),
+  };
+}
+
+const INCOMING_DIR = new Directory(Paths.cache, 'incoming');
+
+/**
+ * Copies a file handed over by another app (share sheet or "Open with") into
+ * our cache, since content:// and security-scoped URIs may stop being
+ * readable once the hand-off ends.
+ */
+export async function importIncoming(uri: string, name: string | null, ext: string): Promise<PickedFile> {
+  if (!INCOMING_DIR.exists) INCOMING_DIR.create({ intermediates: true });
+  const src = new File(uri);
+  let srcName = '';
+  try {
+    srcName = src.name;
+  } catch {
+    // Some providers expose no name at all.
+  }
+  // Document providers often yield an internal id (e.g. "msf:20") rather than
+  // the display name, so only trust candidates that look like a file name.
+  const looksNamed = (n?: string | null) => !!n && /\.[a-z0-9]{2,5}$/i.test(n);
+  // e.g. ".../document/primary%3ADownload%2Fcontoh.pdf" -> "contoh.pdf"
+  const segment = decodeURIComponent(uri.split('/').pop() ?? '').replace(/^.*[:/]/, '');
+  const picked = [name, srcName, segment].find(looksNamed);
+  const clean = sanitize(picked ?? `${t('dokumen')}.${ext}`);
+  const dest = new File(INCOMING_DIR, `${Date.now()}-${clean}`);
+  // Read + write rather than copy(): copy() rejects content:// sources
+  // that have no file name.
+  const bytes = await src.bytes();
+  dest.create();
+  dest.write(bytes);
+  return { uri: dest.uri, name: clean, size: bytes.length };
 }
 
 function ensureOutputDir() {

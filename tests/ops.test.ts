@@ -223,3 +223,39 @@ describe('pageLabels', () => {
     assert.deepEqual(ops.pageLabels('{n}', 5, 2), ['5', '6']);
   });
 });
+
+describe('drawn signatures', () => {
+  it('crops strokes to their bounds and smooths them', () => {
+    const path = ops.strokesToPath(
+      [
+        [
+          { x: 10, y: 10 },
+          { x: 20, y: 30 },
+          { x: 40, y: 20 },
+        ],
+        [{ x: 50, y: 50 }],
+      ],
+      0
+    )!;
+    assert.equal(path.width, 40);
+    assert.equal(path.height, 40);
+    assert.match(path.d, /^M0 0 Q10 20 20 15 L30 10 M40 40 L40.1 40$/);
+    assert.equal(ops.strokesToPath([]), null);
+  });
+  it('stamps a vector signature, also on rotated pages', async () => {
+    const path = ops.strokesToPath([
+      [
+        { x: 0, y: 40 },
+        { x: 30, y: 0 },
+        { x: 60, y: 40 },
+        { x: 90, y: 0 },
+      ],
+    ])!;
+    const opts = { path, strokeWidth: 3, color: '#1a3399', cx: 0.5, cy: 0.5, widthFraction: 0.4 };
+    const src = await makePdf(2, { rotateFirst: 90 });
+    const out = await ops.stampPath(src, { ...opts, pageIndex: 0 });
+    dump('signature-drawn.pdf', out);
+    dump('signature-drawn-upright.pdf', await ops.stampPath(src, { ...opts, pageIndex: 1 }));
+    assert.equal((await PDFDocument.load(out)).getPageCount(), 2);
+  });
+});

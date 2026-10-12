@@ -7,6 +7,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { usePageThumbs, type PdfSource } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { exportFile, formatBytes, shareFile, type OutputFile } from '@/lib/files';
+import { t } from '@/lib/i18n';
 
 const PDF_ICON = { ios: 'doc.fill', android: 'picture_as_pdf' } as const;
 
@@ -14,9 +15,9 @@ const PDF_ICON = { ios: 'doc.fill', android: 'picture_as_pdf' } as const;
 export async function saveWithFeedback(file: OutputFile) {
   try {
     const saved = await exportFile(file);
-    if (saved && Platform.OS === 'android') Alert.alert('Tersimpan', `${file.name} berhasil disimpan.`);
+    if (saved && Platform.OS === 'android') Alert.alert(t('Tersimpan'), t('{name} berhasil disimpan.', { name: file.name }));
   } catch (e) {
-    Alert.alert('Gagal menyimpan', (e as Error)?.message ?? String(e));
+    Alert.alert(t('Gagal menyimpan'), (e as Error)?.message ?? String(e));
   }
 }
 
@@ -36,8 +37,8 @@ export function SourceCard({
   if (!source) {
     return (
       <Card>
-        <Body secondary>Pilih file PDF dari perangkat. Semua proses berjalan di HP kamu, tanpa upload.</Body>
-        <Button title="Pilih PDF" icon={{ ios: 'doc.badge.plus', android: 'upload_file' }} onPress={onPick} loading={loading} />
+        <Body secondary>{t('Pilih file PDF dari perangkat. Semua proses berjalan di HP kamu, tanpa upload.')}</Body>
+        <Button title={t('Pilih PDF')} icon={{ ios: 'doc.badge.plus', android: 'upload_file' }} onPress={onPick} loading={loading} />
         {error && <ErrorBanner message={error} />}
       </Card>
     );
@@ -52,11 +53,11 @@ export function SourceCard({
             {source.name}
           </Text>
           <Text style={{ color: theme.textSecondary }}>
-            {info.pageCount} halaman · {formatBytes(source.size)}
-            {info.encrypted ? ' · terkunci' : ''}
+            {t('{n} halaman', { n: info.pageCount })} · {formatBytes(source.size)}
+            {info.encrypted ? ` · ${t('terkunci')}` : ''}
           </Text>
         </View>
-        <Button title="Ganti" variant="secondary" compact onPress={onPick} loading={loading} />
+        <Button title={t('Ganti')} variant="secondary" compact onPress={onPick} loading={loading} />
       </View>
       {error && <ErrorBanner message={error} />}
     </Card>
@@ -105,7 +106,7 @@ export function PageGrid({
           <Pressable
             key={`${pageIndex}-${pos}`}
             accessibilityRole="button"
-            accessibilityLabel={`Halaman ${pageIndex + 1}`}
+            accessibilityLabel={t('Halaman {n}', { n: pageIndex + 1 })}
             accessibilityState={{ selected: isSel }}
             onPress={() => onPress?.(pageIndex)}
             style={{ width: cell, alignItems: 'center', gap: 4 }}>
@@ -153,7 +154,7 @@ export function ResultPanel({ results }: { results: OutputFile[] }) {
   if (results.length === 0) return null;
   return (
     <Card style={{ borderWidth: 1, borderColor: theme.success }}>
-      <Label>{results.length > 1 ? `Selesai · ${results.length} file` : 'Selesai'}</Label>
+      <Label>{results.length > 1 ? t('Selesai · {n} file', { n: results.length }) : t('Selesai')}</Label>
       {results.map((r) => (
         <View key={r.uri} style={styles.resultRow}>
           <View style={{ flex: 1 }}>
@@ -163,21 +164,21 @@ export function ResultPanel({ results }: { results: OutputFile[] }) {
             <Text style={{ color: theme.textSecondary }}>{formatBytes(r.size)}</Text>
           </View>
           <Button
-            title="Bagikan"
+            title={t('Bagikan')}
             compact
             variant="secondary"
             icon={{ ios: 'square.and.arrow.up', android: 'share' }}
             onPress={() => shareFile(r)}
           />
           <Button
-            title="Simpan"
+            title={t('Simpan')}
             compact
             icon={{ ios: 'square.and.arrow.down', android: 'download' }}
             onPress={() => saveWithFeedback(r)}
           />
         </View>
       ))}
-      <Button title="Lihat semua file" variant="secondary" onPress={() => router.navigate('/files')} />
+      <Button title={t('Lihat semua file')} variant="secondary" onPress={() => router.navigate('/files')} />
     </Card>
   );
 }
@@ -216,7 +217,7 @@ export function RunSection({
 }) {
   return (
     <>
-      <Button title={run.busy ? 'Memproses…' : title} onPress={onPress} loading={run.busy} disabled={disabled} />
+      <Button title={run.busy ? t('Memproses…') : title} onPress={onPress} loading={run.busy} disabled={disabled} />
       {run.error && <ErrorBanner message={run.error} />}
       <ResultPanel results={run.results} />
     </>

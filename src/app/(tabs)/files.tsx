@@ -7,6 +7,7 @@ import { Body, Button, Card, IconBadge, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteOutput, formatBytes, listOutputs, shareFile, type OutputFile } from '@/lib/files';
+import { localeTag, t } from '@/lib/i18n';
 
 const ICONS = {
   pdf: { ios: 'doc.fill', android: 'picture_as_pdf' },
@@ -27,10 +28,10 @@ export default function FilesScreen() {
   useFocusEffect(refresh);
 
   function confirmDelete(f: OutputFile) {
-    Alert.alert('Hapus file?', f.name, [
-      { text: 'Batal', style: 'cancel' },
+    Alert.alert(t('Hapus file?'), f.name, [
+      { text: t('Batal'), style: 'cancel' },
       {
-        text: 'Hapus',
+        text: t('Hapus'),
         style: 'destructive',
         onPress: () => {
           deleteOutput(f.uri);
@@ -42,14 +43,17 @@ export default function FilesScreen() {
 
   return (
     <Screen topInset>
-      <Text style={[styles.title, { color: theme.text }]}>File</Text>
+      <Text style={[styles.title, { color: theme.text }]}>{t('File')}</Text>
       {files.length === 0 ? (
         <Card>
-          <Body secondary>Belum ada hasil. File yang kamu buat dengan alat-alat akan muncul di sini.</Body>
+          <Body secondary>{t('Belum ada hasil. File yang kamu buat dengan alat-alat akan muncul di sini.')}</Body>
         </Card>
       ) : (
         <Body secondary>
-          {files.length} file · {formatBytes(files.reduce((n, f) => n + f.size, 0))} tersimpan di aplikasi
+          {t('{n} file · {size} tersimpan di aplikasi', {
+            n: files.length,
+            size: formatBytes(files.reduce((n, f) => n + f.size, 0)),
+          })}
         </Body>
       )}
       {files.map((f) => (
@@ -61,14 +65,14 @@ export default function FilesScreen() {
                 {f.name}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                {formatBytes(f.size)} · {new Date(f.modified).toLocaleString('id-ID')}
+                {formatBytes(f.size)} · {new Date(f.modified).toLocaleString(localeTag())}
               </Text>
             </View>
           </View>
           <View style={styles.actions}>
-            <Button title="Bagikan" compact variant="secondary" icon={{ ios: 'square.and.arrow.up', android: 'share' }} onPress={() => shareFile(f)} />
-            <Button title="Simpan" compact variant="secondary" icon={{ ios: 'square.and.arrow.down', android: 'download' }} onPress={() => saveWithFeedback(f)} />
-            <Button title="Hapus" compact variant="danger" onPress={() => confirmDelete(f)} />
+            <Button title={t('Bagikan')} compact variant="secondary" icon={{ ios: 'square.and.arrow.up', android: 'share' }} onPress={() => shareFile(f)} />
+            <Button title={t('Simpan')} compact variant="secondary" icon={{ ios: 'square.and.arrow.down', android: 'download' }} onPress={() => saveWithFeedback(f)} />
+            <Button title={t('Hapus')} compact variant="danger" onPress={() => confirmDelete(f)} />
           </View>
         </Card>
       ))}

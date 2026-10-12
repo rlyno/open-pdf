@@ -13,10 +13,17 @@ untuk manipulasi PDF, dan PDFKit (iOS) / PdfRenderer (Android) untuk render hala
 | --- | --- |
 | **Atur** | Gabung PDF · Pisah PDF (tiap N halaman / rentang) · Atur halaman (urutkan, ambil, ganjil/genap, balik) · Putar halaman · Hapus halaman · Multi-halaman (2/4 per lembar) |
 | **Konversi** | Gambar ke PDF (A4/Letter/sesuai gambar) · PDF ke gambar (JPEG/ZIP) · Kompres (lossless atau maksimal via rasterisasi) |
-| **Edit** | Watermark teks (tengah/ulang, warna, transparansi, kemiringan) · Nomor halaman · Tanda tangan/stempel gambar · Info & metadata · Ratakan formulir |
+| **Edit** | Watermark teks (tengah/ulang, warna, transparansi, kemiringan) · Nomor halaman · Tanda tangan (gambar dengan jari, atau dari foto/PNG) · Info & metadata · Ratakan formulir |
 | **Keamanan** | Tambah password (AES-256 + izin cetak/salin/ubah) · Hapus password |
 
 Hasil disimpan di tab **File**, dan bisa dibagikan atau disimpan ke folder (Android: pemilih folder; iOS: "Simpan ke File").
+
+PDF dan gambar juga bisa dikirim dari aplikasi lain lewat menu **Bagikan**, atau dibuka dengan
+**"Buka dengan Open PDF"** (Android) / **"Buka di"** (iOS); aplikasi lalu menawarkan alat yang cocok.
+
+Bahasa mengikuti perangkat: Indonesia untuk perangkat berbahasa Indonesia, selain itu Inggris.
+Teks UI ditulis dalam bahasa Indonesia dan diterjemahkan lewat `t()` di `src/lib/i18n.ts`;
+terjemahan Inggris ada di `src/lib/i18n-en.ts` (tes memastikan tidak ada yang terlewat).
 
 ## Struktur
 
@@ -26,15 +33,18 @@ src/
     (tabs)/index.tsx   Grid alat + pencarian
     (tabs)/files.tsx   Riwayat hasil
     tool/[id].tsx      Membuka layar alat berdasarkan id
+    incoming.tsx       File yang dibagikan/dibuka dari aplikasi lain
+    +native-intent.ts  Mengarahkan link dari OS ke incoming
   lib/
     pdf/ops.ts         Semua operasi PDF (murni: bytes masuk, bytes keluar; tanpa React Native)
     tools.ts           Daftar alat (judul, ikon, kategori)
-    files.ts           Pilih file/gambar, simpan, bagikan
+    files.ts           Pilih file/gambar, simpan, bagikan, impor file dari aplikasi lain
+    i18n.ts            Terjemahan (t()), kamus Inggris di i18n-en.ts
     render.ts          Render halaman via mesin PDF native
   tools/               Layar setiap alat (organize, convert, edit, security)
   components/          Komponen UI bersama
   hooks/use-tool.ts    State pilih PDF, jalankan alat, thumbnail
-tests/ops.test.ts      Tes engine PDF (jalan di Node)
+tests/                 Tes engine PDF dan kelengkapan terjemahan (jalan di Node)
 ```
 
 Menambah alat baru: tulis fungsinya di `src/lib/pdf/ops.ts` (+ tes), daftarkan di `src/lib/tools.ts`,
@@ -70,5 +80,5 @@ npx eas-cli@latest build --profile development --platform all
 
 - Watermark dan nomor halaman memakai font standar PDF, jadi hanya mendukung huruf Latin.
 - Kompres "Maksimal" mengubah halaman menjadi gambar, sehingga teks tidak bisa dipilih lagi.
-- Belum ada: OCR, konversi Office ↔ PDF, dan menggambar tanda tangan langsung di layar
-  (saat ini tanda tangan diambil dari foto/gambar).
+- Belum ada: OCR dan konversi Office ↔ PDF.
+- Menerima file dari aplikasi lain sudah dites di Android; di iOS (share extension) belum dites.

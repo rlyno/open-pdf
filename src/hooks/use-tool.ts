@@ -1,16 +1,38 @@
 import { useEffect, useState } from 'react';
 
 import { baseName, pickPdfs, readBytes, saveOutput, type OutputFile, type PickedFile } from '@/lib/files';
+import { t } from '@/lib/i18n';
 import { PdfToolError, getInfo, type PdfInfo } from '@/lib/pdf/ops';
 import { canRender, renderPage } from '@/lib/render';
 
 export type PdfSource = PickedFile & { info: PdfInfo };
 
-/** Picks one PDF and reads its page count, sizes and encryption state. */
-export function usePdfSource() {
+/** Files handed to a tool up front, e.g. shared into the app from elsewhere. */
+export type ToolProps = { initial?: PickedFile[] };
+
+/**
+ * Picks one PDF and reads its page count, sizes and encryption state.
+ * `initial` (if given) is opened straight away instead of waiting for a pick.
+ */
+export function usePdfSource(initial?: PickedFile) {
   const [source, setSource] = useState<PdfSource | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!initial);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initial) return;
+    let active = true;
+    readBytes(initial.uri)
+      .then(getInfo)
+      .then(
+        (info) => active && setSource({ ...initial, info }),
+        (e) => active && setError(messageOf(e))
+      )
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [initial]);
 
   async function pick() {
     setError(null);
@@ -60,12 +82,15 @@ export function useToolRun() {
 export function messageOf(e: unknown) {
   if (e instanceof PdfToolError) return e.message;
   const msg = (e as Error)?.message ?? String(e);
-  return `Terjadi kesalahan: ${msg}`;
+  return t('Terjadi kesalahan: {msg}', { msg });
 }
 
-/** Output name derived from the source, e.g. "laporan-dirotasi.pdf". */
+/**
+ * Output name derived from the source, e.g. "laporan-diputar.pdf". `suffix`
+ * is translated, so English users get "laporan-rotated.pdf".
+ */
 export function outName(source: { name: string }, suffix: string, ext = 'pdf') {
-  return `${baseName(source.name)}-${suffix}.${ext}`;
+  return `${baseName(source.name)}-${t(suffix)}.${ext}`;
 }
 
 const thumbCache = new Map<string, string>();

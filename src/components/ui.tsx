@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { t } from '@/lib/i18n';
 
 export type Icon = { ios: SFSymbol; android: AndroidSymbol };
 
@@ -197,7 +198,7 @@ export function Stepper({
   const btn = (delta: number, text: string) => (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label} ${delta > 0 ? 'tambah' : 'kurang'}`}
+      accessibilityLabel={`${label} ${delta > 0 ? t('tambah') : t('kurang')}`}
       onPress={() => onChange(clamp(value + delta))}
       disabled={delta > 0 ? value >= max : value <= min}
       style={({ pressed }) => [

@@ -1,30 +1,50 @@
-import { zipSync } from 'fflate';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { zipSync } from 'fflate';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { RunSection, SourceCard } from '@/components/pdf-parts';
 import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { outName, usePdfSource, useToolRun } from '@/hooks/use-tool';
+import { messageOf, outName, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
-import { baseName, formatBytes, pickImages, readBytes, type PickedImage } from '@/lib/files';
+import { baseName, formatBytes, normalizeImage, pickImages, readBytes, type PickedImage } from '@/lib/files';
+import { t } from '@/lib/i18n';
 import * as ops from '@/lib/pdf/ops';
 import { canRender, renderPage } from '@/lib/render';
 
-export function ImagesToPdfTool() {
+export function ImagesToPdfTool({ initial }: ToolProps) {
   const theme = useTheme();
   const run = useToolRun();
   const [images, setImages] = useState<PickedImage[]>([]);
   const [pageSize, setPageSize] = useState<ops.ImagesToPdfOptions['pageSize']>('A4');
   const [margin, setMargin] = useState(20);
-  const [adding, setAdding] = useState(false);
+  // Shared-in images still need converting before they can be embedded.
+  const [adding, setAdding] = useState(!!initial?.length);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initial?.length) return;
+    let active = true;
+    Promise.all(initial.map((f) => normalizeImage(f.uri, f.name)))
+      .then(
+        (imgs) => active && setImages(imgs),
+        (e) => active && setAddError(messageOf(e))
+      )
+      .finally(() => active && setAdding(false));
+    return () => {
+      active = false;
+    };
+  }, [initial]);
 
   async function add() {
     setAdding(true);
+    setAddError(null);
     try {
       const picked = await pickImages({ multiple: true });
       setImages((x) => [...x, ...picked]);
+    } catch (e) {
+      setAddError(messageOf(e));
     } finally {
       setAdding(false);
     }
@@ -40,7 +60,7 @@ export function ImagesToPdfTool() {
   return (
     <Screen>
       <Card>
-        {images.length === 0 && <Body secondary>Pilih foto dari galeri. Urutan di bawah = urutan halaman.</Body>}
+        {images.length === 0 && <Body secondary>{t('Pilih foto dari galeri. Urutan di bawah = urutan halaman.')}</Body>}
         {images.map((img, i) => (
           <View key={`${img.uri}-${i}`} style={styles.row}>
             <Image source={{ uri: img.uri }} style={[styles.thumb, { backgroundColor: theme.background }]} contentFit="cover" />
@@ -52,36 +72,37 @@ export function ImagesToPdfTool() {
             <Button title="✕" compact variant="secondary" onPress={() => setImages((x) => x.filter((_, k) => k !== i))} />
           </View>
         ))}
-        <Button title="Tambah gambar" variant="secondary" icon={{ ios: 'photo.badge.plus', android: 'add_photo_alternate' }} onPress={add} loading={adding} />
+        <Button title={t('Tambah gambar')} variant="secondary" icon={{ ios: 'photo.badge.plus', android: 'add_photo_alternate' }} onPress={add} loading={adding} />
+        {addError && <ErrorBanner message={addError} />}
       </Card>
       {images.length > 0 && (
         <Card>
           <Segmented
-            label="Ukuran halaman"
+            label={t('Ukuran halaman')}
             value={pageSize}
             onChange={setPageSize}
             options={[
               { value: 'A4', label: 'A4' },
               { value: 'Letter', label: 'Letter' },
-              { value: 'fit', label: 'Sesuai gambar' },
+              { value: 'fit', label: t('Sesuai gambar') },
             ]}
           />
           {pageSize !== 'fit' && (
             <Segmented
-              label="Margin"
+              label={t('Margin')}
               value={margin}
               onChange={setMargin}
               options={[
-                { value: 0, label: 'Tanpa' },
-                { value: 20, label: 'Kecil' },
-                { value: 40, label: 'Besar' },
+                { value: 0, label: t('Tanpa') },
+                { value: 20, label: t('Kecil') },
+                { value: 40, label: t('Besar') },
               ]}
             />
           )}
         </Card>
       )}
       <RunSection
-        title={`Buat PDF (${images.length} halaman)`}
+        title={t('Buat PDF ({n} halaman)', { n: images.length })}
         disabled={images.length === 0}
         run={run}
         onPress={() =>
@@ -99,8 +120,8 @@ export function ImagesToPdfTool() {
 
 const RESOLUTIONS = { medium: 1240, high: 2480 } as const;
 
-export function PdfToImagesTool() {
-  const src = usePdfSource();
+export function PdfToImagesTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [res, setRes] = useState<keyof typeof RESOLUTIONS>('medium');
   const [range, setRange] = useState('');
@@ -108,31 +129,31 @@ export function PdfToImagesTool() {
 
   return (
     <Screen>
-      {!canRender() && <ErrorBanner message="Fitur ini butuh development build (tidak berjalan di Expo Go)." />}
+      {!canRender() && <ErrorBanner message={t('Fitur ini butuh development build (tidak berjalan di Expo Go).')} />}
       <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
       {s && (
         <Card>
           <Segmented
-            label="Resolusi"
+            label={t('Resolusi')}
             value={res}
             onChange={setRes}
             options={[
-              { value: 'medium', label: 'Sedang (~150 dpi)' },
-              { value: 'high', label: 'Tinggi (~300 dpi)' },
+              { value: 'medium', label: t('Sedang (~150 dpi)') },
+              { value: 'high', label: t('Tinggi (~300 dpi)') },
             ]}
           />
           <Field
-            label="Halaman (kosongkan = semua)"
+            label={t('Halaman (kosongkan = semua)')}
             value={range}
             onChangeText={setRange}
             placeholder={`1-${s.info.pageCount}`}
             keyboardType="numbers-and-punctuation"
           />
-          <Body secondary>Satu halaman menghasilkan JPEG, lebih dari satu dikemas sebagai ZIP.</Body>
+          <Body secondary>{t('Satu halaman menghasilkan JPEG, lebih dari satu dikemas sebagai ZIP.')}</Body>
         </Card>
       )}
       <RunSection
-        title="Ekspor gambar"
+        title={t('Ekspor gambar')}
         disabled={!s || !canRender()}
         run={run}
         onPress={() =>
@@ -147,7 +168,7 @@ export function PdfToImagesTool() {
             const names = Object.keys(files);
             if (names.length === 1) return [{ name: names[0], bytes: files[names[0]] }];
             // JPEGs are already compressed; store them as-is.
-            return [{ name: `${stem}-gambar.zip`, bytes: zipSync(files, { level: 0 }) }];
+            return [{ name: `${stem}-${t('gambar')}.zip`, bytes: zipSync(files, { level: 0 }) }];
           })
         }
       />
@@ -161,9 +182,9 @@ const LEVELS = {
   strong: { dpi: 80, quality: 50 },
 } as const;
 
-export function CompressTool() {
+export function CompressTool({ initial }: ToolProps) {
   const theme = useTheme();
-  const src = usePdfSource();
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [mode, setMode] = useState<'lossless' | 'raster'>('lossless');
   const [level, setLevel] = useState<keyof typeof LEVELS>('medium');
@@ -176,51 +197,51 @@ export function CompressTool() {
       {s && (
         <Card>
           <Segmented
-            label="Metode"
+            label={t('Metode')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'lossless', label: 'Tanpa kehilangan' },
-              { value: 'raster', label: 'Maksimal' },
+              { value: 'lossless', label: t('Tanpa kehilangan') },
+              { value: 'raster', label: t('Maksimal') },
             ]}
           />
           {mode === 'lossless' ? (
-            <Body secondary>Menyusun ulang struktur file dan membuang data tak terpakai. Kualitas tetap sama.</Body>
+            <Body secondary>{t('Menyusun ulang struktur file dan membuang data tak terpakai. Kualitas tetap sama.')}</Body>
           ) : (
             <>
               <Segmented
-                label="Tingkat"
+                label={t('Tingkat')}
                 value={level}
                 onChange={setLevel}
                 options={[
-                  { value: 'light', label: 'Ringan' },
-                  { value: 'medium', label: 'Sedang' },
-                  { value: 'strong', label: 'Kuat' },
+                  { value: 'light', label: t('Ringan') },
+                  { value: 'medium', label: t('Sedang') },
+                  { value: 'strong', label: t('Kuat') },
                 ]}
               />
               <Body secondary>
-                Setiap halaman diubah menjadi gambar JPEG. Cocok untuk hasil scan; teks tidak bisa dipilih/dicari lagi.
+                {t('Setiap halaman diubah menjadi gambar JPEG. Cocok untuk hasil scan; teks tidak bisa dipilih/dicari lagi.')}
               </Body>
-              {!canRender() && <ErrorBanner message="Mode ini butuh development build (tidak berjalan di Expo Go)." />}
+              {!canRender() && <ErrorBanner message={t('Mode ini butuh development build (tidak berjalan di Expo Go).')} />}
             </>
           )}
         </Card>
       )}
       {s && result && (
         <Card>
-          <Label>Hasil</Label>
+          <Label>{t('Hasil')}</Label>
           <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>
             {formatBytes(s.size)} → {formatBytes(result.size)}
           </Text>
           <Text style={{ color: result.size < s.size ? theme.success : theme.danger }}>
             {result.size < s.size
-              ? `Lebih kecil ${Math.round((1 - result.size / s.size) * 100)}%`
-              : 'File sudah optimal; hasil tidak lebih kecil. Coba metode Maksimal.'}
+              ? t('Lebih kecil {pct}%', { pct: Math.round((1 - result.size / s.size) * 100) })
+              : t('File sudah optimal; hasil tidak lebih kecil. Coba metode Maksimal.')}
           </Text>
         </Card>
       )}
       <RunSection
-        title="Kompres"
+        title={t('Kompres')}
         disabled={!s || (mode === 'raster' && !canRender())}
         run={run}
         onPress={() =>

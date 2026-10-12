@@ -9,6 +9,8 @@
  */
 import type { GenerateOptions, ThumbnailResult } from 'react-native-pdf-thumbnail';
 
+import { t } from '@/lib/i18n';
+
 type Engine = {
   generate(path: string, page: number, opts?: GenerateOptions): Promise<ThumbnailResult>;
 };
@@ -34,6 +36,6 @@ export function canRender() {
 
 export async function renderPage(uri: string, page: number, opts: GenerateOptions): Promise<ThumbnailResult> {
   const e = getEngine();
-  if (!e) throw new Error('Render halaman membutuhkan development build (tidak tersedia di Expo Go).');
+  if (!e) throw new Error(t('Render halaman membutuhkan development build (tidak tersedia di Expo Go).'));
   return e.generate(uri, page, opts);
 }

@@ -20,8 +20,12 @@ export type ToolId =
   | 'protect'
   | 'unlock';
 
+/** What a tool consumes, used to offer tools for files shared into the app. */
+export type ToolInput = 'pdf' | 'pdfs' | 'images';
+
 export type ToolDef = {
   id: ToolId;
+  input: ToolInput;
   title: string;
   description: string;
   category: CategoryId;
@@ -39,6 +43,7 @@ export const CATEGORIES: { id: CategoryId; title: string; color: string }[] = [
 export const TOOLS: ToolDef[] = [
   {
     id: 'merge',
+    input: 'pdfs',
     title: 'Gabung PDF',
     description: 'Satukan beberapa PDF menjadi satu file',
     category: 'organize',
@@ -47,6 +52,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'split',
+    input: 'pdf',
     title: 'Pisah PDF',
     description: 'Pecah PDF per rentang atau tiap N halaman',
     category: 'organize',
@@ -55,6 +61,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'organize',
+    input: 'pdf',
     title: 'Atur Halaman',
     description: 'Urutkan, ambil, atau duplikat halaman',
     category: 'organize',
@@ -63,6 +70,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'rotate',
+    input: 'pdf',
     title: 'Putar Halaman',
     description: 'Putar semua atau sebagian halaman',
     category: 'organize',
@@ -71,6 +79,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'remove-pages',
+    input: 'pdf',
     title: 'Hapus Halaman',
     description: 'Buang halaman yang tidak diperlukan',
     category: 'organize',
@@ -79,6 +88,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'n-up',
+    input: 'pdf',
     title: 'Multi-Halaman',
     description: 'Cetak 2 atau 4 halaman per lembar',
     category: 'organize',
@@ -87,6 +97,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'images-to-pdf',
+    input: 'images',
     title: 'Gambar ke PDF',
     description: 'Ubah foto atau scan menjadi PDF',
     category: 'convert',
@@ -95,6 +106,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'pdf-to-images',
+    input: 'pdf',
     title: 'PDF ke Gambar',
     description: 'Ekspor halaman menjadi JPEG',
     category: 'convert',
@@ -103,6 +115,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'compress',
+    input: 'pdf',
     title: 'Kompres PDF',
     description: 'Perkecil ukuran file',
     category: 'convert',
@@ -111,6 +124,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'watermark',
+    input: 'pdf',
     title: 'Watermark',
     description: 'Tambahkan teks watermark',
     category: 'edit',
@@ -119,6 +133,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'page-numbers',
+    input: 'pdf',
     title: 'Nomor Halaman',
     description: 'Beri nomor di setiap halaman',
     category: 'edit',
@@ -127,6 +142,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'sign',
+    input: 'pdf',
     title: 'Tanda Tangan / Gambar',
     description: 'Tempel tanda tangan atau stempel',
     category: 'edit',
@@ -135,6 +151,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'metadata',
+    input: 'pdf',
     title: 'Info & Metadata',
     description: 'Lihat dan ubah judul, penulis, dll.',
     category: 'edit',
@@ -143,6 +160,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'flatten',
+    input: 'pdf',
     title: 'Ratakan Formulir',
     description: 'Kunci isian formulir agar tidak bisa diubah',
     category: 'edit',
@@ -151,6 +169,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'protect',
+    input: 'pdf',
     title: 'Tambah Password',
     description: 'Enkripsi PDF dengan AES-256',
     category: 'security',
@@ -159,6 +178,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'unlock',
+    input: 'pdf',
     title: 'Hapus Password',
     description: 'Buka PDF terkunci (butuh password)',
     category: 'security',
@@ -166,6 +186,10 @@ export const TOOLS: ToolDef[] = [
     keywords: 'unlock decrypt remove password',
   },
 ];
+
+export function toolsFor(input: ToolInput): ToolDef[] {
+  return TOOLS.filter((t) => t.input === input);
+}
 
 export function getTool(id: string): ToolDef | undefined {
   return TOOLS.find((t) => t.id === id);

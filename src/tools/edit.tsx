@@ -1,23 +1,26 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { RunSection, SourceCard } from '@/components/pdf-parts';
+import { INK_COLORS, INK_WIDTH, SignaturePad } from '@/components/signature-pad';
 import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { outName, usePdfSource, useToolRun, type PdfSource } from '@/hooks/use-tool';
+import { outName, type PdfSource, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { pickImages, readBytes, type PickedImage } from '@/lib/files';
+import { localeTag, t } from '@/lib/i18n';
 import * as ops from '@/lib/pdf/ops';
 import { canRender, renderPage } from '@/lib/render';
 
 const COLORS = ['#808080', '#E5483B', '#2F6FEB', '#1A9A6C', '#000000'];
 
-export function WatermarkTool() {
+export function WatermarkTool({ initial }: ToolProps) {
   const theme = useTheme();
-  const src = usePdfSource();
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
-  const [text, setText] = useState('RAHASIA');
+  const [text, setText] = useState(() => t('RAHASIA'));
   const [fontSize, setFontSize] = useState(60);
   const [opacity, setOpacity] = useState(25);
   const [angle, setAngle] = useState(45);
@@ -30,11 +33,11 @@ export function WatermarkTool() {
       <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
       {s && (
         <Card>
-          <Field label="Teks" value={text} onChangeText={setText} placeholder="RAHASIA" />
-          <Stepper label="Ukuran huruf" value={fontSize} onChange={setFontSize} min={12} max={160} step={4} />
-          <Stepper label="Transparansi" value={opacity} onChange={setOpacity} min={5} max={100} step={5} format={(v) => `${v}%`} />
+          <Field label={t('Teks')} value={text} onChangeText={setText} placeholder={t('RAHASIA')} />
+          <Stepper label={t('Ukuran huruf')} value={fontSize} onChange={setFontSize} min={12} max={160} step={4} />
+          <Stepper label={t('Transparansi')} value={opacity} onChange={setOpacity} min={5} max={100} step={5} format={(v) => `${v}%`} />
           <Segmented
-            label="Kemiringan"
+            label={t('Kemiringan')}
             value={angle}
             onChange={setAngle}
             options={[
@@ -44,24 +47,24 @@ export function WatermarkTool() {
               { value: 90, label: '90°' },
             ]}
           />
-          <Label>Warna</Label>
+          <Label>{t('Warna')}</Label>
           <View style={styles.swatches}>
             {COLORS.map((c) => (
               <Pressable
                 key={c}
                 accessibilityRole="button"
-                accessibilityLabel={`Warna ${c}`}
+                accessibilityLabel={t('Warna {color}', { color: c })}
                 accessibilityState={{ selected: c === color }}
                 onPress={() => setColor(c)}
                 style={[styles.swatch, { backgroundColor: c, borderColor: c === color ? theme.text : 'transparent' }]}
               />
             ))}
           </View>
-          <SwitchRow label="Ulangi di seluruh halaman" value={tiled} onChange={setTiled} />
+          <SwitchRow label={t('Ulangi di seluruh halaman')} value={tiled} onChange={setTiled} />
         </Card>
       )}
       <RunSection
-        title="Tambahkan watermark"
+        title={t('Tambahkan watermark')}
         disabled={!s || !text.trim()}
         run={run}
         onPress={() =>
@@ -84,19 +87,20 @@ export function WatermarkTool() {
   );
 }
 
-const FORMATS = [
+/** Number formats; the words are printed into the PDF, so they follow the app language. */
+const formats = () => [
   { value: '{n}', label: '1' },
   { value: '{n} / {total}', label: '1 / N' },
-  { value: 'Halaman {n}', label: 'Hal. 1' },
-  { value: 'Halaman {n} dari {total}', label: 'Hal. 1 dari N' },
+  { value: t('Halaman {n}', { n: '{n}' }), label: t('Hal. 1') },
+  { value: t('Halaman {n} dari {total}', { n: '{n}', total: '{total}' }), label: t('Hal. 1 dari N') },
 ];
 
-export function PageNumbersTool() {
-  const src = usePdfSource();
+export function PageNumbersTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [vert, setVert] = useState<'top' | 'bottom'>('bottom');
   const [horiz, setHoriz] = useState<'left' | 'center' | 'right'>('center');
-  const [format, setFormat] = useState(FORMATS[0].value);
+  const [format, setFormat] = useState('{n}');
   const [startAt, setStartAt] = useState(1);
   const [fontSize, setFontSize] = useState(11);
   const [skipFirst, setSkipFirst] = useState(false);
@@ -107,25 +111,33 @@ export function PageNumbersTool() {
       <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
       {s && (
         <Card>
-          <Segmented label="Posisi vertikal" value={vert} onChange={setVert} options={[{ value: 'top', label: 'Atas' }, { value: 'bottom', label: 'Bawah' }]} />
           <Segmented
-            label="Posisi horizontal"
+            label={t('Posisi vertikal')}
+            value={vert}
+            onChange={setVert}
+            options={[
+              { value: 'top', label: t('Atas') },
+              { value: 'bottom', label: t('Bawah') },
+            ]}
+          />
+          <Segmented
+            label={t('Posisi horizontal')}
             value={horiz}
             onChange={setHoriz}
             options={[
-              { value: 'left', label: 'Kiri' },
-              { value: 'center', label: 'Tengah' },
-              { value: 'right', label: 'Kanan' },
+              { value: 'left', label: t('Kiri') },
+              { value: 'center', label: t('Tengah') },
+              { value: 'right', label: t('Kanan') },
             ]}
           />
-          <Segmented label="Format" value={format} onChange={setFormat} options={FORMATS} />
-          <Stepper label="Mulai dari" value={startAt} onChange={setStartAt} min={0} max={9999} />
-          <Stepper label="Ukuran huruf" value={fontSize} onChange={setFontSize} min={6} max={36} />
-          <SwitchRow label="Lewati halaman pertama (sampul)" value={skipFirst} onChange={setSkipFirst} />
+          <Segmented label={t('Format')} value={format} onChange={setFormat} options={formats()} />
+          <Stepper label={t('Mulai dari')} value={startAt} onChange={setStartAt} min={0} max={9999} />
+          <Stepper label={t('Ukuran huruf')} value={fontSize} onChange={setFontSize} min={6} max={36} />
+          <SwitchRow label={t('Lewati halaman pertama (sampul)')} value={skipFirst} onChange={setSkipFirst} />
         </Card>
       )}
       <RunSection
-        title="Tambahkan nomor"
+        title={t('Tambahkan nomor')}
         disabled={!s}
         run={run}
         onPress={() =>
@@ -149,11 +161,18 @@ export function PageNumbersTool() {
 }
 
 /** Places an image (signature, stamp, logo) by tapping on a page preview. */
-export function SignTool() {
+type Stamp =
+  | { kind: 'image'; image: PickedImage }
+  | { kind: 'drawn'; path: ops.DrawnPath; color: string };
+
+/** Places a drawn or picked signature (or stamp/logo) by tapping a page preview. */
+export function SignTool({ initial }: ToolProps) {
   const theme = useTheme();
-  const src = usePdfSource();
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
-  const [image, setImage] = useState<PickedImage | null>(null);
+  const [stamp, setStamp] = useState<Stamp | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [ink, setInk] = useState(INK_COLORS[1]);
   const [page, setPage] = useState(1);
   const [pos, setPos] = useState({ cx: 0.7, cy: 0.85 });
   const [widthPct, setWidthPct] = useState(30);
@@ -178,37 +197,64 @@ export function SignTool() {
   const size = s?.info.pageSizes[page - 1];
   const boxH = size ? (boxW * size.height) / size.width : 0;
   const stampW = (boxW * widthPct) / 100;
-  const stampH = image ? (stampW * image.height) / image.width : 0;
+  const aspect = !stamp ? 0 : stamp.kind === 'image' ? stamp.image.height / stamp.image.width : stamp.path.height / stamp.path.width;
+  const stampH = stampW * aspect;
 
   return (
     <Screen>
       <SourceCard source={s} onPick={async () => { await src.pick(); setPage(1); }} loading={src.loading} error={src.error} />
       {s && (
         <Card>
-          <Body secondary>Tips: foto tanda tangan di kertas putih, atau gunakan PNG transparan agar hasilnya rapi.</Body>
-          <Button
-            title={image ? 'Ganti gambar' : 'Pilih gambar tanda tangan'}
-            variant={image ? 'secondary' : 'primary'}
-            icon={{ ios: 'signature', android: 'draw' }}
-            onPress={async () => {
-              const [img] = await pickImages({ multiple: false, maxSide: 1600 });
-              if (img) setImage(img);
-            }}
-          />
-          <Stepper label="Halaman" value={page} onChange={setPage} min={1} max={s.info.pageCount} />
-          <Stepper label="Lebar" value={widthPct} onChange={setWidthPct} min={5} max={90} step={5} format={(v) => `${v}%`} />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={t('Gambar')}
+                variant={stamp?.kind === 'drawn' ? 'primary' : 'secondary'}
+                icon={{ ios: 'signature', android: 'draw' }}
+                onPress={() => setDrawing(true)}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={t('Dari foto')}
+                variant={stamp?.kind === 'image' ? 'primary' : 'secondary'}
+                icon={{ ios: 'photo', android: 'image' }}
+                onPress={async () => {
+                  const [img] = await pickImages({ multiple: false, maxSide: 1600 });
+                  if (img) setStamp({ kind: 'image', image: img });
+                }}
+              />
+            </View>
+          </View>
+          <Body secondary>
+            {stamp
+              ? t('Ketuk halaman di bawah untuk memindahkan posisi.')
+              : t('Gambar tanda tangan dengan jari, atau pakai foto/PNG transparan.')}
+          </Body>
+          <Stepper label={t('Halaman ke')} value={page} onChange={setPage} min={1} max={s.info.pageCount} />
+          <Stepper label={t('Lebar')} value={widthPct} onChange={setWidthPct} min={5} max={90} step={5} format={(v) => `${v}%`} />
         </Card>
       )}
+      <SignaturePad
+        visible={drawing}
+        color={ink}
+        onColor={setInk}
+        onCancel={() => setDrawing(false)}
+        onDone={(path) => {
+          setStamp({ kind: 'drawn', path, color: ink });
+          setDrawing(false);
+        }}
+      />
       {s && size && (
         <View onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
-          {!canRender() && <ErrorBanner message="Pratinjau halaman butuh development build. Posisi tetap bisa diatur." />}
+          {!canRender() && <ErrorBanner message={t('Pratinjau halaman butuh development build. Posisi tetap bisa diatur.')} />}
           {boxW > 0 && (
             <Pressable
-              accessibilityLabel="Ketuk untuk menempatkan gambar"
+              accessibilityLabel={t('Ketuk untuk menempatkan tanda tangan')}
               onPress={(e) => setPos({ cx: e.nativeEvent.locationX / boxW, cy: e.nativeEvent.locationY / boxH })}
               style={[styles.page, { width: boxW, height: boxH, borderColor: theme.border }]}>
               {preview && <Image source={{ uri: preview }} style={StyleSheet.absoluteFill} contentFit="fill" pointerEvents="none" />}
-              {image && (
+              {stamp && (
                 <View
                   pointerEvents="none"
                   style={{
@@ -221,41 +267,48 @@ export function SignTool() {
                     borderColor: theme.accent,
                     borderStyle: 'dashed',
                   }}>
-                  <Image source={{ uri: image.uri }} contentFit="fill" style={StyleSheet.absoluteFill} />
+                  {stamp.kind === 'image' ? (
+                    <Image source={{ uri: stamp.image.uri }} contentFit="fill" style={StyleSheet.absoluteFill} />
+                  ) : (
+                    <Svg width="100%" height="100%" viewBox={`0 0 ${stamp.path.width} ${stamp.path.height}`}>
+                      <Path
+                        d={stamp.path.d}
+                        stroke={stamp.color}
+                        strokeWidth={INK_WIDTH}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                  )}
                 </View>
               )}
             </Pressable>
           )}
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: Spacing.two }}>
-            Ketuk halaman untuk memindahkan posisi
-          </Text>
         </View>
       )}
       <RunSection
-        title="Tempel ke PDF"
-        disabled={!s || !image}
+        title={t('Tempel ke PDF')}
+        disabled={!s || !stamp}
         run={run}
         onPress={() =>
-          run.run(async () => [
-            {
-              name: outName(s!, 'ditandatangani'),
-              bytes: await ops.stampImage(await readBytes(s!.uri), {
-                image: image!,
-                pageIndex: page - 1,
-                cx: pos.cx,
-                cy: pos.cy,
-                widthFraction: widthPct / 100,
-              }),
-            },
-          ])
+          run.run(async () => {
+            const bytes = await readBytes(s!.uri);
+            const place = { pageIndex: page - 1, cx: pos.cx, cy: pos.cy, widthFraction: widthPct / 100 };
+            const out =
+              stamp!.kind === 'image'
+                ? await ops.stampImage(bytes, { ...place, image: stamp!.image })
+                : await ops.stampPath(bytes, { ...place, path: stamp!.path, color: stamp!.color, strokeWidth: INK_WIDTH });
+            return [{ name: outName(s!, 'ditandatangani'), bytes: out }];
+          })
         }
       />
     </Screen>
   );
 }
 
-export function MetadataTool() {
-  const src = usePdfSource();
+export function MetadataTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const s = src.source;
   return (
     <Screen>
@@ -280,19 +333,19 @@ function MetadataForm({ source: s }: { source: PdfSource }) {
   const field = (key: keyof ops.Metadata, label: string) => (
     <Field label={label} value={meta[key] ?? ''} onChangeText={(v) => setMeta((m) => ({ ...m, [key]: v }))} />
   );
-  const fmt = (d?: Date) => (d ? d.toLocaleString('id-ID') : '—');
+  const fmt = (d?: Date) => (d ? d.toLocaleString(localeTag()) : '—');
 
   return (
     <>
       <Card>
-        <Label>Informasi</Label>
+        <Label>{t('Informasi')}</Label>
         {[
-          ['Halaman', String(s.info.pageCount)],
-          ['Ukuran halaman 1', `${Math.round(s.info.pageSizes[0]?.width ?? 0)} × ${Math.round(s.info.pageSizes[0]?.height ?? 0)} pt`],
-          ['Terenkripsi', s.info.encrypted ? 'Ya' : 'Tidak'],
-          ['Formulir', s.info.hasForm ? 'Ada' : 'Tidak ada'],
-          ['Dibuat', fmt(s.info.creationDate)],
-          ['Diubah', fmt(s.info.modificationDate)],
+          [t('Halaman'), String(s.info.pageCount)],
+          [t('Ukuran halaman 1'), `${Math.round(s.info.pageSizes[0]?.width ?? 0)} × ${Math.round(s.info.pageSizes[0]?.height ?? 0)} pt`],
+          [t('Terenkripsi'), s.info.encrypted ? t('Ya') : t('Tidak')],
+          [t('Formulir'), s.info.hasForm ? t('Ada') : t('Tidak ada')],
+          [t('Dibuat'), fmt(s.info.creationDate)],
+          [t('Diubah'), fmt(s.info.modificationDate)],
           ['Producer', s.info.producer || '—'],
         ].map(([k, v]) => (
           <View key={k} style={styles.infoRow}>
@@ -302,19 +355,19 @@ function MetadataForm({ source: s }: { source: PdfSource }) {
         ))}
       </Card>
       {s.info.encrypted ? (
-        <ErrorBanner message='PDF terkunci. Buka dulu dengan alat "Hapus Password" untuk mengubah metadata.' />
+        <ErrorBanner message={t('PDF terkunci. Buka dulu dengan alat "Hapus Password" untuk mengubah metadata.')} />
       ) : (
         <>
           <Card>
-            <Label>Metadata</Label>
-            {field('title', 'Judul')}
-            {field('author', 'Penulis')}
-            {field('subject', 'Subjek')}
-            {field('keywords', 'Kata kunci (pisahkan dengan koma)')}
-            {field('creator', 'Aplikasi pembuat')}
+            <Label>{t('Metadata')}</Label>
+            {field('title', t('Judul'))}
+            {field('author', t('Penulis'))}
+            {field('subject', t('Subjek'))}
+            {field('keywords', t('Kata kunci (pisahkan dengan koma)'))}
+            {field('creator', t('Aplikasi pembuat'))}
           </Card>
           <RunSection
-            title="Simpan metadata"
+            title={t('Simpan metadata')}
             run={run}
             onPress={() => run.run(async () => [{ name: outName(s, 'metadata'), bytes: await ops.setMetadata(await readBytes(s.uri), meta) }])}
           />
@@ -324,8 +377,8 @@ function MetadataForm({ source: s }: { source: PdfSource }) {
   );
 }
 
-export function FlattenTool() {
-  const src = usePdfSource();
+export function FlattenTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const s = src.source;
   return (
@@ -335,13 +388,13 @@ export function FlattenTool() {
         <Card>
           <Body secondary>
             {s.info.hasForm
-              ? 'Isian formulir akan dijadikan bagian dari halaman sehingga tidak bisa diubah lagi.'
-              : 'PDF ini tidak memiliki formulir yang bisa diratakan.'}
+              ? t('Isian formulir akan dijadikan bagian dari halaman sehingga tidak bisa diubah lagi.')
+              : t('PDF ini tidak memiliki formulir yang bisa diratakan.')}
           </Body>
         </Card>
       )}
       <RunSection
-        title="Ratakan"
+        title={t('Ratakan')}
         disabled={!s || !s.info.hasForm}
         run={run}
         onPress={() => run.run(async () => [{ name: outName(s!, 'rata'), bytes: await ops.flattenForm(await readBytes(s!.uri)) }])}
@@ -354,5 +407,6 @@ const styles = StyleSheet.create({
   swatches: { flexDirection: 'row', gap: Spacing.three },
   swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
   page: { borderWidth: 1, backgroundColor: '#fff', overflow: 'hidden' },
+  row: { flexDirection: 'row', gap: Spacing.two },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.three },
 });

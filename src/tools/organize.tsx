@@ -4,14 +4,15 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PageGrid, RunSection, SourceCard } from '@/components/pdf-parts';
 import { Body, Button, Card, Field, Label, Screen, Segmented, Stepper } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { outName, usePdfSource, useToolRun } from '@/hooks/use-tool';
+import { outName, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { baseName, formatBytes, pickPdfs, readBytes, type PickedFile } from '@/lib/files';
+import { t } from '@/lib/i18n';
 import * as ops from '@/lib/pdf/ops';
 
-export function MergeTool() {
+export function MergeTool({ initial }: ToolProps) {
   const theme = useTheme();
-  const [files, setFiles] = useState<PickedFile[]>([]);
+  const [files, setFiles] = useState<PickedFile[]>(initial ?? []);
   const run = useToolRun();
 
   async function add() {
@@ -29,7 +30,7 @@ export function MergeTool() {
   return (
     <Screen>
       <Card>
-        {files.length === 0 && <Body secondary>Tambahkan dua file PDF atau lebih. Urutan di bawah = urutan hasil.</Body>}
+        {files.length === 0 && <Body secondary>{t('Tambahkan dua file PDF atau lebih. Urutan di bawah = urutan hasil.')}</Body>}
         {files.map((f, i) => (
           <View key={`${f.uri}-${i}`} style={styles.listRow}>
             <Text style={[styles.index, { color: theme.textSecondary }]}>{i + 1}</Text>
@@ -44,16 +45,16 @@ export function MergeTool() {
             <Button title="✕" compact variant="secondary" onPress={() => setFiles((x) => x.filter((_, k) => k !== i))} />
           </View>
         ))}
-        <Button title="Tambah PDF" variant="secondary" icon={{ ios: 'plus', android: 'add' }} onPress={add} />
+        <Button title={t('Tambah PDF')} variant="secondary" icon={{ ios: 'plus', android: 'add' }} onPress={add} />
       </Card>
       <RunSection
-        title={`Gabungkan ${files.length || ''} file`}
+        title={files.length ? t('Gabungkan {n} file', { n: files.length }) : t('Gabungkan')}
         disabled={files.length < 2}
         run={run}
         onPress={() =>
           run.run(async () => {
             const bytes = await Promise.all(files.map((f) => readBytes(f.uri)));
-            return [{ name: `${baseName(files[0].name)}-gabungan.pdf`, bytes: await ops.merge(bytes) }];
+            return [{ name: `${baseName(files[0].name)}-${t('gabungan')}.pdf`, bytes: await ops.merge(bytes) }];
           })
         }
       />
@@ -61,8 +62,8 @@ export function MergeTool() {
   );
 }
 
-export function SplitTool() {
-  const src = usePdfSource();
+export function SplitTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [mode, setMode] = useState<'ranges' | 'every'>('every');
   const [ranges, setRanges] = useState('');
@@ -78,21 +79,21 @@ export function SplitTool() {
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'every', label: 'Tiap N halaman' },
-              { value: 'ranges', label: 'Rentang khusus' },
+              { value: 'every', label: t('Tiap N halaman') },
+              { value: 'ranges', label: t('Rentang khusus') },
             ]}
           />
           {mode === 'every' ? (
             <>
-              <Stepper label="Halaman per file" value={every} onChange={setEvery} min={1} max={Math.max(1, s.info.pageCount - 1)} />
-              <Body secondary>Menghasilkan {Math.ceil(s.info.pageCount / every)} file.</Body>
+              <Stepper label={t('Halaman per file')} value={every} onChange={setEvery} min={1} max={Math.max(1, s.info.pageCount - 1)} />
+              <Body secondary>{t('Menghasilkan {n} file.', { n: Math.ceil(s.info.pageCount / every) })}</Body>
             </>
           ) : (
             <Field
-              label="Rentang (satu file per bagian)"
+              label={t('Rentang (satu file per bagian)')}
               value={ranges}
               onChangeText={setRanges}
-              placeholder={`contoh: 1-3, 4-${s.info.pageCount}`}
+              placeholder={t('contoh: 1-3, 4-{n}', { n: s.info.pageCount })}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
             />
@@ -100,7 +101,7 @@ export function SplitTool() {
         </Card>
       )}
       <RunSection
-        title="Pisahkan"
+        title={t('Pisahkan')}
         disabled={!s || (mode === 'ranges' && !ranges.trim())}
         run={run}
         onPress={() =>
@@ -110,7 +111,7 @@ export function SplitTool() {
               mode === 'every'
                 ? await ops.splitEvery(bytes, every)
                 : await ops.splitIntoGroups(bytes, ops.parseRangeGroups(ranges, s!.info.pageCount));
-            return parts.map((b, i) => ({ name: outName(s!, `bagian-${i + 1}`), bytes: b }));
+            return parts.map((b, i) => ({ name: outName(s!, t('bagian-{n}', { n: i + 1 })), bytes: b }));
           })
         }
       />
@@ -119,9 +120,9 @@ export function SplitTool() {
 }
 
 /** Builds a new page order by tapping pages; tap again to remove. */
-export function OrganizeTool() {
+export function OrganizeTool({ initial }: ToolProps) {
   const theme = useTheme();
-  const src = usePdfSource();
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [order, setOrder] = useState<number[]>([]);
   const s = src.source;
@@ -137,16 +138,18 @@ export function OrganizeTool() {
       {s && (
         <>
           <Card>
-            <Body secondary>Ketuk halaman sesuai urutan yang kamu mau. Halaman yang tidak diketuk tidak ikut.</Body>
+            <Body secondary>{t('Ketuk halaman sesuai urutan yang kamu mau. Halaman yang tidak diketuk tidak ikut.')}</Body>
             <View style={styles.wrap}>
-              <Button title="Semua" compact variant="secondary" onPress={() => setOrder(all)} />
-              <Button title="Balik urutan" compact variant="secondary" onPress={() => setOrder([...all].reverse())} />
-              <Button title="Ganjil" compact variant="secondary" onPress={() => setOrder(all.filter((i) => i % 2 === 0))} />
-              <Button title="Genap" compact variant="secondary" onPress={() => setOrder(all.filter((i) => i % 2 === 1))} />
-              <Button title="Reset" compact variant="secondary" onPress={() => setOrder([])} />
+              <Button title={t('Semua')} compact variant="secondary" onPress={() => setOrder(all)} />
+              <Button title={t('Balik urutan')} compact variant="secondary" onPress={() => setOrder([...all].reverse())} />
+              <Button title={t('Ganjil')} compact variant="secondary" onPress={() => setOrder(all.filter((i) => i % 2 === 0))} />
+              <Button title={t('Genap')} compact variant="secondary" onPress={() => setOrder(all.filter((i) => i % 2 === 1))} />
+              <Button title={t('Reset')} compact variant="secondary" onPress={() => setOrder([])} />
             </View>
             <Text style={{ color: theme.textSecondary }}>
-              {order.length ? `Urutan baru: ${order.map((i) => i + 1).join(', ')}` : 'Belum ada halaman dipilih.'}
+              {order.length
+                ? t('Urutan baru: {pages}', { pages: order.map((i) => i + 1).join(', ') })
+                : t('Belum ada halaman dipilih.')}
             </Text>
           </Card>
           <PageGrid
@@ -158,7 +161,7 @@ export function OrganizeTool() {
         </>
       )}
       <RunSection
-        title={`Buat PDF (${order.length} halaman)`}
+        title={t('Buat PDF ({n} halaman)', { n: order.length })}
         disabled={!s || order.length === 0}
         run={run}
         onPress={() =>
@@ -169,8 +172,8 @@ export function OrganizeTool() {
   );
 }
 
-export function RotateTool() {
-  const src = usePdfSource();
+export function RotateTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [angle, setAngle] = useState(90);
   const [scope, setScope] = useState<'all' | 'some'>('all');
@@ -185,25 +188,25 @@ export function RotateTool() {
         <>
           <Card>
             <Segmented
-              label="Putar"
+              label={t('Putar')}
               value={angle}
               onChange={setAngle}
               options={[
-                { value: 90, label: '90° kanan' },
+                { value: 90, label: t('90° kanan') },
                 { value: 180, label: '180°' },
-                { value: 270, label: '90° kiri' },
+                { value: 270, label: t('90° kiri') },
               ]}
             />
             <Segmented
-              label="Halaman"
+              label={t('Halaman')}
               value={scope}
               onChange={setScope}
               options={[
-                { value: 'all', label: 'Semua' },
-                { value: 'some', label: 'Pilih sendiri' },
+                { value: 'all', label: t('Semua') },
+                { value: 'some', label: t('Pilih sendiri') },
               ]}
             />
-            {scope === 'some' && <Body secondary>Ketuk halaman yang ingin diputar ({picked.size} dipilih).</Body>}
+            {scope === 'some' && <Body secondary>{t('Ketuk halaman yang ingin diputar ({n} dipilih).', { n: picked.size })}</Body>}
           </Card>
           <PageGrid
             source={s}
@@ -222,7 +225,7 @@ export function RotateTool() {
         </>
       )}
       <RunSection
-        title="Putar"
+        title={t('Putar')}
         disabled={!s || (scope === 'some' && picked.size === 0)}
         run={run}
         onPress={() =>
@@ -238,8 +241,8 @@ export function RotateTool() {
   );
 }
 
-export function RemovePagesTool() {
-  const src = usePdfSource();
+export function RemovePagesTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const s = src.source;
@@ -249,7 +252,7 @@ export function RemovePagesTool() {
       <SourceCard source={s} onPick={async () => { await src.pick(); setPicked(new Set()); }} loading={src.loading} error={src.error} />
       {s && (
         <>
-          <Body secondary>Ketuk halaman yang ingin dihapus ({picked.size} dipilih).</Body>
+          <Body secondary>{t('Ketuk halaman yang ingin dihapus ({n} dipilih).', { n: picked.size })}</Body>
           <PageGrid
             source={s}
             selected={(i) => picked.has(i)}
@@ -266,7 +269,7 @@ export function RemovePagesTool() {
         </>
       )}
       <RunSection
-        title={`Hapus ${picked.size} halaman`}
+        title={t('Hapus {n} halaman', { n: picked.size })}
         disabled={!s || picked.size === 0}
         run={run}
         onPress={() =>
@@ -277,8 +280,8 @@ export function RemovePagesTool() {
   );
 }
 
-export function NUpTool() {
-  const src = usePdfSource();
+export function NUpTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [per, setPer] = useState<2 | 4>(2);
   const s = src.source;
@@ -288,19 +291,19 @@ export function NUpTool() {
       {s && (
         <Card>
           <Segmented
-            label="Halaman per lembar"
+            label={t('Halaman per lembar')}
             value={per}
             onChange={setPer}
             options={[
-              { value: 2, label: '2 (lanskap)' },
-              { value: 4, label: '4 (potret)' },
+              { value: 2, label: t('2 (lanskap)') },
+              { value: 4, label: t('4 (potret)') },
             ]}
           />
-          <Label>Hasil: {Math.ceil(s.info.pageCount / per)} lembar A4</Label>
+          <Label>{t('Hasil: {n} lembar A4', { n: Math.ceil(s.info.pageCount / per) })}</Label>
         </Card>
       )}
       <RunSection
-        title="Buat"
+        title={t('Buat')}
         disabled={!s}
         run={run}
         onPress={() => run.run(async () => [{ name: outName(s!, `${per}-up`), bytes: await ops.nUp(await readBytes(s!.uri), per) }])}
