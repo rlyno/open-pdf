@@ -1,0 +1,358 @@
+import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { RunSection, SourceCard } from '@/components/pdf-parts';
+import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow } from '@/components/ui';
+import { Spacing } from '@/constants/theme';
+import { outName, usePdfSource, useToolRun, type PdfSource } from '@/hooks/use-tool';
+import { useTheme } from '@/hooks/use-theme';
+import { pickImages, readBytes, type PickedImage } from '@/lib/files';
+import * as ops from '@/lib/pdf/ops';
+import { canRender, renderPage } from '@/lib/render';
+
+const COLORS = ['#808080', '#E5483B', '#2F6FEB', '#1A9A6C', '#000000'];
+
+export function WatermarkTool() {
+  const theme = useTheme();
+  const src = usePdfSource();
+  const run = useToolRun();
+  const [text, setText] = useState('RAHASIA');
+  const [fontSize, setFontSize] = useState(60);
+  const [opacity, setOpacity] = useState(25);
+  const [angle, setAngle] = useState(45);
+  const [color, setColor] = useState(COLORS[0]);
+  const [tiled, setTiled] = useState(false);
+  const s = src.source;
+
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
+      {s && (
+        <Card>
+          <Field label="Teks" value={text} onChangeText={setText} placeholder="RAHASIA" />
+          <Stepper label="Ukuran huruf" value={fontSize} onChange={setFontSize} min={12} max={160} step={4} />
+          <Stepper label="Transparansi" value={opacity} onChange={setOpacity} min={5} max={100} step={5} format={(v) => `${v}%`} />
+          <Segmented
+            label="Kemiringan"
+            value={angle}
+            onChange={setAngle}
+            options={[
+              { value: 0, label: '0°' },
+              { value: 30, label: '30°' },
+              { value: 45, label: '45°' },
+              { value: 90, label: '90°' },
+            ]}
+          />
+          <Label>Warna</Label>
+          <View style={styles.swatches}>
+            {COLORS.map((c) => (
+              <Pressable
+                key={c}
+                accessibilityRole="button"
+                accessibilityLabel={`Warna ${c}`}
+                accessibilityState={{ selected: c === color }}
+                onPress={() => setColor(c)}
+                style={[styles.swatch, { backgroundColor: c, borderColor: c === color ? theme.text : 'transparent' }]}
+              />
+            ))}
+          </View>
+          <SwitchRow label="Ulangi di seluruh halaman" value={tiled} onChange={setTiled} />
+        </Card>
+      )}
+      <RunSection
+        title="Tambahkan watermark"
+        disabled={!s || !text.trim()}
+        run={run}
+        onPress={() =>
+          run.run(async () => [
+            {
+              name: outName(s!, 'watermark'),
+              bytes: await ops.addTextWatermark(await readBytes(s!.uri), {
+                text,
+                fontSize,
+                opacity: opacity / 100,
+                angle,
+                color,
+                tiled,
+              }),
+            },
+          ])
+        }
+      />
+    </Screen>
+  );
+}
+
+const FORMATS = [
+  { value: '{n}', label: '1' },
+  { value: '{n} / {total}', label: '1 / N' },
+  { value: 'Halaman {n}', label: 'Hal. 1' },
+  { value: 'Halaman {n} dari {total}', label: 'Hal. 1 dari N' },
+];
+
+export function PageNumbersTool() {
+  const src = usePdfSource();
+  const run = useToolRun();
+  const [vert, setVert] = useState<'top' | 'bottom'>('bottom');
+  const [horiz, setHoriz] = useState<'left' | 'center' | 'right'>('center');
+  const [format, setFormat] = useState(FORMATS[0].value);
+  const [startAt, setStartAt] = useState(1);
+  const [fontSize, setFontSize] = useState(11);
+  const [skipFirst, setSkipFirst] = useState(false);
+  const s = src.source;
+
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
+      {s && (
+        <Card>
+          <Segmented label="Posisi vertikal" value={vert} onChange={setVert} options={[{ value: 'top', label: 'Atas' }, { value: 'bottom', label: 'Bawah' }]} />
+          <Segmented
+            label="Posisi horizontal"
+            value={horiz}
+            onChange={setHoriz}
+            options={[
+              { value: 'left', label: 'Kiri' },
+              { value: 'center', label: 'Tengah' },
+              { value: 'right', label: 'Kanan' },
+            ]}
+          />
+          <Segmented label="Format" value={format} onChange={setFormat} options={FORMATS} />
+          <Stepper label="Mulai dari" value={startAt} onChange={setStartAt} min={0} max={9999} />
+          <Stepper label="Ukuran huruf" value={fontSize} onChange={setFontSize} min={6} max={36} />
+          <SwitchRow label="Lewati halaman pertama (sampul)" value={skipFirst} onChange={setSkipFirst} />
+        </Card>
+      )}
+      <RunSection
+        title="Tambahkan nomor"
+        disabled={!s}
+        run={run}
+        onPress={() =>
+          run.run(async () => [
+            {
+              name: outName(s!, 'bernomor'),
+              bytes: await ops.addPageNumbers(await readBytes(s!.uri), {
+                position: `${vert}-${horiz}` as ops.NumberPosition,
+                format,
+                startAt,
+                fontSize,
+                margin: 28,
+                pages: skipFirst ? s!.info.pageSizes.map((_, i) => i).slice(1) : undefined,
+              }),
+            },
+          ])
+        }
+      />
+    </Screen>
+  );
+}
+
+/** Places an image (signature, stamp, logo) by tapping on a page preview. */
+export function SignTool() {
+  const theme = useTheme();
+  const src = usePdfSource();
+  const run = useToolRun();
+  const [image, setImage] = useState<PickedImage | null>(null);
+  const [page, setPage] = useState(1);
+  const [pos, setPos] = useState({ cx: 0.7, cy: 0.85 });
+  const [widthPct, setWidthPct] = useState(30);
+  const [rendered, setRendered] = useState<{ key: string; uri: string } | null>(null);
+  const [boxW, setBoxW] = useState(0);
+  const s = src.source;
+  const previewKey = s ? `${s.uri}#${page}` : '';
+  const preview = rendered?.key === previewKey ? rendered.uri : null;
+
+  useEffect(() => {
+    if (!s || !canRender()) return;
+    let active = true;
+    const key = `${s.uri}#${page}`;
+    renderPage(s.uri, page - 1, { maxWidth: 1000, quality: 80 })
+      .then((r) => active && setRendered({ key, uri: r.uri }))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [s, page]);
+
+  const size = s?.info.pageSizes[page - 1];
+  const boxH = size ? (boxW * size.height) / size.width : 0;
+  const stampW = (boxW * widthPct) / 100;
+  const stampH = image ? (stampW * image.height) / image.width : 0;
+
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={async () => { await src.pick(); setPage(1); }} loading={src.loading} error={src.error} />
+      {s && (
+        <Card>
+          <Body secondary>Tips: foto tanda tangan di kertas putih, atau gunakan PNG transparan agar hasilnya rapi.</Body>
+          <Button
+            title={image ? 'Ganti gambar' : 'Pilih gambar tanda tangan'}
+            variant={image ? 'secondary' : 'primary'}
+            icon={{ ios: 'signature', android: 'draw' }}
+            onPress={async () => {
+              const [img] = await pickImages({ multiple: false, maxSide: 1600 });
+              if (img) setImage(img);
+            }}
+          />
+          <Stepper label="Halaman" value={page} onChange={setPage} min={1} max={s.info.pageCount} />
+          <Stepper label="Lebar" value={widthPct} onChange={setWidthPct} min={5} max={90} step={5} format={(v) => `${v}%`} />
+        </Card>
+      )}
+      {s && size && (
+        <View onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
+          {!canRender() && <ErrorBanner message="Pratinjau halaman butuh development build. Posisi tetap bisa diatur." />}
+          {boxW > 0 && (
+            <Pressable
+              accessibilityLabel="Ketuk untuk menempatkan gambar"
+              onPress={(e) => setPos({ cx: e.nativeEvent.locationX / boxW, cy: e.nativeEvent.locationY / boxH })}
+              style={[styles.page, { width: boxW, height: boxH, borderColor: theme.border }]}>
+              {preview && <Image source={{ uri: preview }} style={StyleSheet.absoluteFill} contentFit="fill" pointerEvents="none" />}
+              {image && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    width: stampW,
+                    height: stampH,
+                    left: pos.cx * boxW - stampW / 2,
+                    top: pos.cy * boxH - stampH / 2,
+                    borderWidth: 1,
+                    borderColor: theme.accent,
+                    borderStyle: 'dashed',
+                  }}>
+                  <Image source={{ uri: image.uri }} contentFit="fill" style={StyleSheet.absoluteFill} />
+                </View>
+              )}
+            </Pressable>
+          )}
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: Spacing.two }}>
+            Ketuk halaman untuk memindahkan posisi
+          </Text>
+        </View>
+      )}
+      <RunSection
+        title="Tempel ke PDF"
+        disabled={!s || !image}
+        run={run}
+        onPress={() =>
+          run.run(async () => [
+            {
+              name: outName(s!, 'ditandatangani'),
+              bytes: await ops.stampImage(await readBytes(s!.uri), {
+                image: image!,
+                pageIndex: page - 1,
+                cx: pos.cx,
+                cy: pos.cy,
+                widthFraction: widthPct / 100,
+              }),
+            },
+          ])
+        }
+      />
+    </Screen>
+  );
+}
+
+export function MetadataTool() {
+  const src = usePdfSource();
+  const s = src.source;
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
+      {/* Keyed so the form starts fresh from each newly picked file. */}
+      {s && <MetadataForm key={s.uri} source={s} />}
+    </Screen>
+  );
+}
+
+function MetadataForm({ source: s }: { source: PdfSource }) {
+  const theme = useTheme();
+  const run = useToolRun();
+  const [meta, setMeta] = useState<ops.Metadata>(() => ({
+    title: s.info.title,
+    author: s.info.author,
+    subject: s.info.subject,
+    keywords: s.info.keywords,
+    creator: s.info.creator,
+  }));
+
+  const field = (key: keyof ops.Metadata, label: string) => (
+    <Field label={label} value={meta[key] ?? ''} onChangeText={(v) => setMeta((m) => ({ ...m, [key]: v }))} />
+  );
+  const fmt = (d?: Date) => (d ? d.toLocaleString('id-ID') : '—');
+
+  return (
+    <>
+      <Card>
+        <Label>Informasi</Label>
+        {[
+          ['Halaman', String(s.info.pageCount)],
+          ['Ukuran halaman 1', `${Math.round(s.info.pageSizes[0]?.width ?? 0)} × ${Math.round(s.info.pageSizes[0]?.height ?? 0)} pt`],
+          ['Terenkripsi', s.info.encrypted ? 'Ya' : 'Tidak'],
+          ['Formulir', s.info.hasForm ? 'Ada' : 'Tidak ada'],
+          ['Dibuat', fmt(s.info.creationDate)],
+          ['Diubah', fmt(s.info.modificationDate)],
+          ['Producer', s.info.producer || '—'],
+        ].map(([k, v]) => (
+          <View key={k} style={styles.infoRow}>
+            <Text style={{ color: theme.textSecondary }}>{k}</Text>
+            <Text style={{ color: theme.text, flexShrink: 1, textAlign: 'right' }}>{v}</Text>
+          </View>
+        ))}
+      </Card>
+      {s.info.encrypted ? (
+        <ErrorBanner message='PDF terkunci. Buka dulu dengan alat "Hapus Password" untuk mengubah metadata.' />
+      ) : (
+        <>
+          <Card>
+            <Label>Metadata</Label>
+            {field('title', 'Judul')}
+            {field('author', 'Penulis')}
+            {field('subject', 'Subjek')}
+            {field('keywords', 'Kata kunci (pisahkan dengan koma)')}
+            {field('creator', 'Aplikasi pembuat')}
+          </Card>
+          <RunSection
+            title="Simpan metadata"
+            run={run}
+            onPress={() => run.run(async () => [{ name: outName(s, 'metadata'), bytes: await ops.setMetadata(await readBytes(s.uri), meta) }])}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+export function FlattenTool() {
+  const src = usePdfSource();
+  const run = useToolRun();
+  const s = src.source;
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
+      {s && (
+        <Card>
+          <Body secondary>
+            {s.info.hasForm
+              ? 'Isian formulir akan dijadikan bagian dari halaman sehingga tidak bisa diubah lagi.'
+              : 'PDF ini tidak memiliki formulir yang bisa diratakan.'}
+          </Body>
+        </Card>
+      )}
+      <RunSection
+        title="Ratakan"
+        disabled={!s || !s.info.hasForm}
+        run={run}
+        onPress={() => run.run(async () => [{ name: outName(s!, 'rata'), bytes: await ops.flattenForm(await readBytes(s!.uri)) }])}
+      />
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  swatches: { flexDirection: 'row', gap: Spacing.three },
+  swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
+  page: { borderWidth: 1, backgroundColor: '#fff', overflow: 'hidden' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.three },
+});

@@ -1,0 +1,36 @@
+diff --git a/node_modules/react-native-pdf-thumbnail/android/src/main/java/org/songsterq/pdfthumbnail/PdfThumbnailModule.kt b/node_modules/react-native-pdf-thumbnail/android/src/main/java/org/songsterq/pdfthumbnail/PdfThumbnailModule.kt
+index 9bd3c1b..2ffe4c0 100644
+--- a/node_modules/react-native-pdf-thumbnail/android/src/main/java/org/songsterq/pdfthumbnail/PdfThumbnailModule.kt
++++ b/node_modules/react-native-pdf-thumbnail/android/src/main/java/org/songsterq/pdfthumbnail/PdfThumbnailModule.kt
+@@ -158,9 +158,12 @@ class PdfThumbnailModule(reactContext: ReactApplicationContext) :
+         if (pageWidth <= 0 || pageHeight <= 0) {
+           throw ThumbnailException("INVALID_FILE", "File $filePath, page $page has invalid dimensions")
+         }
+-        var scale = 1.0
++        // Patched (open-pdf): scale to fit the limits, upscaling too, so callers
++        // can render above 72 dpi. With no limits the page renders at 1x.
++        var scale = Double.POSITIVE_INFINITY
+         if (maxWidth > 0) scale = min(scale, maxWidth / pageWidth)
+         if (maxHeight > 0) scale = min(scale, maxHeight / pageHeight)
++        if (scale.isInfinite()) scale = 1.0
+         // Same positive rounding as Math.round in JS and floor(x + 0.5) on iOS.
+         val width = maxOf(1, floor(pageWidth * scale + 0.5).toInt())
+         val height = maxOf(1, floor(pageHeight * scale + 0.5).toInt())
+diff --git a/node_modules/react-native-pdf-thumbnail/ios/PdfThumbnail.mm b/node_modules/react-native-pdf-thumbnail/ios/PdfThumbnail.mm
+index 5a73416..133e13b 100644
+--- a/node_modules/react-native-pdf-thumbnail/ios/PdfThumbnail.mm
++++ b/node_modules/react-native-pdf-thumbnail/ios/PdfThumbnail.mm
+@@ -120,9 +120,12 @@ - (NSDictionary *)generatePage:(PDFPage *)pdfPage
+         @"File %@, page %ld has invalid dimensions", filePath, (long)page], nil);
+     return nil;
+   }
+-  double scale = 1;
++  // Patched (open-pdf): scale to fit the limits, upscaling too, so callers
++  // can render above 72 dpi. With no limits the page renders at 1x.
++  double scale = INFINITY;
+   if (maxWidth > 0) scale = std::min(scale, maxWidth / pageWidth);
+   if (maxHeight > 0) scale = std::min(scale, maxHeight / pageHeight);
++  if (std::isinf(scale)) scale = 1;
+   // Exactly the JS Math.round rule for positive dimensions, computed once.
+   double width = std::max(1.0, std::floor(pageWidth * scale + 0.5));
+   double height = std::max(1.0, std::floor(pageHeight * scale + 0.5));
