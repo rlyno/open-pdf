@@ -1,5 +1,5 @@
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -25,22 +25,57 @@ export function SymbolIcon({ icon, size = 22, color }: { icon: Icon; size?: numb
   return <SymbolView name={icon} size={size} tintColor={color} />;
 }
 
-/** Scrollable page. `topInset` is for screens without a navigation header. */
-export function Screen({ children, topInset }: { children: ReactNode; topInset?: boolean }) {
+/**
+ * Scrollable page. `topInset` is for screens without a navigation header.
+ * `footer` stays pinned below the scroll area (e.g. a long page grid's main
+ * action); the page scrolls back to the top whenever `scrollToTopKey` changes
+ * to a truthy value, so freshly produced results come into view.
+ */
+export function Screen({
+  children,
+  topInset,
+  footer,
+  scrollToTopKey,
+}: {
+  children: ReactNode;
+  topInset?: boolean;
+  footer?: ReactNode;
+  scrollToTopKey?: unknown;
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  return (
+  const ref = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (scrollToTopKey) ref.current?.scrollTo({ y: 0, animated: true });
+  }, [scrollToTopKey]);
+
+  const scroll = (
     <ScrollView
-      style={{ backgroundColor: theme.background }}
+      ref={ref}
+      style={{ flex: 1, backgroundColor: theme.background }}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.screen,
-        { paddingBottom: insets.bottom + Spacing.five },
+        { paddingBottom: footer ? Spacing.three : insets.bottom + Spacing.five },
         topInset && { paddingTop: insets.top + Spacing.three },
       ]}>
       {children}
     </ScrollView>
+  );
+  if (!footer) return scroll;
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {scroll}
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: insets.bottom + Spacing.two, borderTopColor: theme.border, backgroundColor: theme.background },
+        ]}>
+        {footer}
+      </View>
+    </View>
   );
 }
 
@@ -247,6 +282,14 @@ const styles = StyleSheet.create({
   screen: {
     padding: Spacing.three,
     gap: Spacing.three,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
+  footer: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',

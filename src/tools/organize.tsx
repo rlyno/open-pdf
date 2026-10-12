@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { PageGrid, RunSection, SourceCard } from '@/components/pdf-parts';
+import { PageGrid, RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
 import { Body, Button, Card, Field, Label, Screen, Segmented, Stepper } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { outName, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
@@ -133,8 +133,20 @@ export function OrganizeTool({ initial }: ToolProps) {
   }
 
   return (
-    <Screen>
+    <Screen
+      scrollToTopKey={run.results.length}
+      footer={
+        <RunButton
+          title={t('Buat PDF ({n} halaman)', { n: order.length })}
+          disabled={!s || order.length === 0}
+          run={run}
+          onPress={() =>
+            run.run(async () => [{ name: outName(s!, 'diatur'), bytes: await ops.selectPages(await readBytes(s!.uri), order) }])
+          }
+        />
+      }>
       <SourceCard source={s} onPick={async () => { await src.pick(); setOrder([]); }} loading={src.loading} error={src.error} />
+      <RunOutput run={run} />
       {s && (
         <>
           <Card>
@@ -160,14 +172,6 @@ export function OrganizeTool({ initial }: ToolProps) {
           />
         </>
       )}
-      <RunSection
-        title={t('Buat PDF ({n} halaman)', { n: order.length })}
-        disabled={!s || order.length === 0}
-        run={run}
-        onPress={() =>
-          run.run(async () => [{ name: outName(s!, 'diatur'), bytes: await ops.selectPages(await readBytes(s!.uri), order) }])
-        }
-      />
     </Screen>
   );
 }
@@ -182,8 +186,25 @@ export function RotateTool({ initial }: ToolProps) {
   const affected = (i: number) => scope === 'all' || picked.has(i);
 
   return (
-    <Screen>
+    <Screen
+      scrollToTopKey={run.results.length}
+      footer={
+        <RunButton
+          title={t('Putar')}
+          disabled={!s || (scope === 'some' && picked.size === 0)}
+          run={run}
+          onPress={() =>
+            run.run(async () => [
+              {
+                name: outName(s!, 'diputar'),
+                bytes: await ops.rotate(await readBytes(s!.uri), angle, scope === 'all' ? undefined : [...picked]),
+              },
+            ])
+          }
+        />
+      }>
       <SourceCard source={s} onPick={async () => { await src.pick(); setPicked(new Set()); }} loading={src.loading} error={src.error} />
+      <RunOutput run={run} />
       {s && (
         <>
           <Card>
@@ -224,19 +245,6 @@ export function RotateTool({ initial }: ToolProps) {
           />
         </>
       )}
-      <RunSection
-        title={t('Putar')}
-        disabled={!s || (scope === 'some' && picked.size === 0)}
-        run={run}
-        onPress={() =>
-          run.run(async () => [
-            {
-              name: outName(s!, 'diputar'),
-              bytes: await ops.rotate(await readBytes(s!.uri), angle, scope === 'all' ? undefined : [...picked]),
-            },
-          ])
-        }
-      />
     </Screen>
   );
 }
@@ -248,8 +256,20 @@ export function RemovePagesTool({ initial }: ToolProps) {
   const s = src.source;
 
   return (
-    <Screen>
+    <Screen
+      scrollToTopKey={run.results.length}
+      footer={
+        <RunButton
+          title={t('Hapus {n} halaman', { n: picked.size })}
+          disabled={!s || picked.size === 0}
+          run={run}
+          onPress={() =>
+            run.run(async () => [{ name: outName(s!, 'dihapus'), bytes: await ops.removePages(await readBytes(s!.uri), [...picked]) }])
+          }
+        />
+      }>
       <SourceCard source={s} onPick={async () => { await src.pick(); setPicked(new Set()); }} loading={src.loading} error={src.error} />
+      <RunOutput run={run} />
       {s && (
         <>
           <Body secondary>{t('Ketuk halaman yang ingin dihapus ({n} dipilih).', { n: picked.size })}</Body>
@@ -268,14 +288,6 @@ export function RemovePagesTool({ initial }: ToolProps) {
           />
         </>
       )}
-      <RunSection
-        title={t('Hapus {n} halaman', { n: picked.size })}
-        disabled={!s || picked.size === 0}
-        run={run}
-        onPress={() =>
-          run.run(async () => [{ name: outName(s!, 'dihapus'), bytes: await ops.removePages(await readBytes(s!.uri), [...picked]) }])
-        }
-      />
     </Screen>
   );
 }

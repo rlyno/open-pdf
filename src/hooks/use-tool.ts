@@ -107,6 +107,16 @@ export function usePageThumbs(uri: string | undefined, pageCount: number, maxWid
   useEffect(() => {
     if (!uri || !canRender()) return;
     let active = true;
+    // Publish thumbnails in batches: one state update per page would
+    // re-render the grid hundreds of times for a large document.
+    let batch: Record<string, string> = {};
+    let lastFlush = Date.now();
+    const flush = () => {
+      const ready = batch;
+      batch = {};
+      lastFlush = Date.now();
+      if (active && Object.keys(ready).length) setRendered((prev) => ({ ...prev, ...ready }));
+    };
     (async () => {
       for (let i = 0; i < pageCount && active; i++) {
         const key = `${uri}#${i}@${maxWidth}`;
@@ -120,9 +130,11 @@ export function usePageThumbs(uri: string | undefined, pageCount: number, maxWid
             continue;
           }
         }
-        const value = thumb;
-        if (active) setRendered((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
+        batch[key] = thumb;
+        // The first screenful appears right away, then roughly twice a second.
+        if (i < 9 || Date.now() - lastFlush > 500) flush();
       }
+      flush();
     })();
     return () => {
       active = false;

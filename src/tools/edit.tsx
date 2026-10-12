@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { RunSection, SourceCard } from '@/components/pdf-parts';
+import { RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
 import { INK_COLORS, INK_WIDTH, SignaturePad } from '@/components/signature-pad';
 import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -201,8 +201,28 @@ export function SignTool({ initial }: ToolProps) {
   const stampH = stampW * aspect;
 
   return (
-    <Screen>
+    <Screen
+      scrollToTopKey={run.results.length}
+      footer={
+        <RunButton
+          title={t('Tempel ke PDF')}
+          disabled={!s || !stamp}
+          run={run}
+          onPress={() =>
+            run.run(async () => {
+              const bytes = await readBytes(s!.uri);
+              const place = { pageIndex: page - 1, cx: pos.cx, cy: pos.cy, widthFraction: widthPct / 100 };
+              const out =
+                stamp!.kind === 'image'
+                  ? await ops.stampImage(bytes, { ...place, image: stamp!.image })
+                  : await ops.stampPath(bytes, { ...place, path: stamp!.path, color: stamp!.color, strokeWidth: INK_WIDTH });
+              return [{ name: outName(s!, 'ditandatangani'), bytes: out }];
+            })
+          }
+        />
+      }>
       <SourceCard source={s} onPick={async () => { await src.pick(); setPage(1); }} loading={src.loading} error={src.error} />
+      <RunOutput run={run} />
       {s && (
         <Card>
           <View style={styles.row}>
@@ -287,22 +307,6 @@ export function SignTool({ initial }: ToolProps) {
           )}
         </View>
       )}
-      <RunSection
-        title={t('Tempel ke PDF')}
-        disabled={!s || !stamp}
-        run={run}
-        onPress={() =>
-          run.run(async () => {
-            const bytes = await readBytes(s!.uri);
-            const place = { pageIndex: page - 1, cx: pos.cx, cy: pos.cy, widthFraction: widthPct / 100 };
-            const out =
-              stamp!.kind === 'image'
-                ? await ops.stampImage(bytes, { ...place, image: stamp!.image })
-                : await ops.stampPath(bytes, { ...place, path: stamp!.path, color: stamp!.color, strokeWidth: INK_WIDTH });
-            return [{ name: outName(s!, 'ditandatangani'), bytes: out }];
-          })
-        }
-      />
     </Screen>
   );
 }

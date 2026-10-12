@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { memo } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Body, Button, Card, ErrorBanner, IconBadge, Label } from '@/components/ui';
@@ -84,7 +85,6 @@ export function PageGrid({
   /** Which source pages to show, in order. Defaults to all. */
   pages?: number[];
 }) {
-  const theme = useTheme();
   const { width } = useWindowDimensions();
   const thumbs = usePageThumbs(source.uri, source.info.pageCount);
   const contentWidth = Math.min(width, MaxContentWidth) - Spacing.three * 2;
@@ -94,59 +94,89 @@ export function PageGrid({
 
   return (
     <View style={[styles.grid, { gap: Spacing.two }]}>
-      {list.map((pageIndex, pos) => {
-        const isSel = selected?.(pageIndex) ?? false;
-        const rot = rotation?.(pageIndex) ?? 0;
-        // A sideways preview swaps its box so it still fits after rotating.
-        const sideways = rot % 180 !== 0;
-        const boxW = cell - 8;
-        const boxH = cell * 1.5 - 8;
-        const label = badge?.(pageIndex);
-        return (
-          <Pressable
-            key={`${pageIndex}-${pos}`}
-            accessibilityRole="button"
-            accessibilityLabel={t('Halaman {n}', { n: pageIndex + 1 })}
-            accessibilityState={{ selected: isSel }}
-            onPress={() => onPress?.(pageIndex)}
-            style={{ width: cell, alignItems: 'center', gap: 4 }}>
-            <View
-              style={[
-                styles.thumb,
-                {
-                  width: cell,
-                  height: cell * 1.5,
-                  borderColor: isSel ? theme.accent : theme.border,
-                  borderWidth: isSel ? 3 : 1,
-                  backgroundColor: theme.background,
-                },
-              ]}>
-              {thumbs[pageIndex] ? (
-                <Image
-                  source={{ uri: thumbs[pageIndex] }}
-                  contentFit="contain"
-                  style={{
-                    width: sideways ? boxH : boxW,
-                    height: sideways ? boxW : boxH,
-                    transform: [{ rotate: `${rot}deg` }],
-                  }}
-                />
-              ) : (
-                <Text style={{ color: theme.textSecondary, fontSize: 20, fontWeight: '600' }}>{pageIndex + 1}</Text>
-              )}
-              {label && (
-                <View style={[styles.badge, { backgroundColor: theme.accent }]}>
-                  <Text style={styles.badgeText}>{label}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{pageIndex + 1}</Text>
-          </Pressable>
-        );
-      })}
+      {list.map((pageIndex, pos) => (
+        <PageCell
+          key={`${pageIndex}-${pos}`}
+          pageIndex={pageIndex}
+          size={cell}
+          thumb={thumbs[pageIndex]}
+          selected={selected?.(pageIndex) ?? false}
+          rotation={rotation?.(pageIndex) ?? 0}
+          badge={badge?.(pageIndex)}
+          onPress={onPress}
+        />
+      ))}
     </View>
   );
 }
+
+/**
+ * One page tile. Memoised with primitive props so a newly rendered thumbnail
+ * only re-renders its own tile, not every page of a large document.
+ */
+const PageCell = memo(function PageCell({
+  pageIndex,
+  size,
+  thumb,
+  selected,
+  rotation,
+  badge,
+  onPress,
+}: {
+  pageIndex: number;
+  size: number;
+  thumb?: string;
+  selected: boolean;
+  rotation: number;
+  badge?: string;
+  onPress?: (index: number) => void;
+}) {
+  const theme = useTheme();
+  // A sideways preview swaps its box so it still fits after rotating.
+  const sideways = rotation % 180 !== 0;
+  const boxW = size - 8;
+  const boxH = size * 1.5 - 8;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('Halaman {n}', { n: pageIndex + 1 })}
+      accessibilityState={{ selected }}
+      onPress={() => onPress?.(pageIndex)}
+      style={{ width: size, alignItems: 'center', gap: 4 }}>
+      <View
+        style={[
+          styles.thumb,
+          {
+            width: size,
+            height: size * 1.5,
+            borderColor: selected ? theme.accent : theme.border,
+            borderWidth: selected ? 3 : 1,
+            backgroundColor: theme.background,
+          },
+        ]}>
+        {thumb ? (
+          <Image
+            source={{ uri: thumb }}
+            contentFit="contain"
+            style={{
+              width: sideways ? boxH : boxW,
+              height: sideways ? boxW : boxH,
+              transform: [{ rotate: `${rotation}deg` }],
+            }}
+          />
+        ) : (
+          <Text style={{ color: theme.textSecondary, fontSize: 20, fontWeight: '600' }}>{pageIndex + 1}</Text>
+        )}
+        {badge && (
+          <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+            <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{pageIndex + 1}</Text>
+    </Pressable>
+  );
+});
 
 /** Lists files a tool produced, with share and save actions. */
 export function ResultPanel({ results }: { results: OutputFile[] }) {
@@ -203,8 +233,10 @@ const styles = StyleSheet.create({
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 });
 
-/** The run button plus whatever the run produced (error or files). */
-export function RunSection({
+type RunState = { busy: boolean; error: string | null; results: OutputFile[] };
+
+/** The main action button of a tool. */
+export function RunButton({
   title,
   onPress,
   disabled,
@@ -213,13 +245,27 @@ export function RunSection({
   title: string;
   onPress: () => void;
   disabled?: boolean;
-  run: { busy: boolean; error: string | null; results: OutputFile[] };
+  run: RunState;
 }) {
+  return <Button title={run.busy ? t('Memproses…') : title} onPress={onPress} loading={run.busy} disabled={disabled} />;
+}
+
+/** Whatever a run produced: an error or the output files. */
+export function RunOutput({ run }: { run: RunState }) {
   return (
     <>
-      <Button title={run.busy ? t('Memproses…') : title} onPress={onPress} loading={run.busy} disabled={disabled} />
       {run.error && <ErrorBanner message={run.error} />}
       <ResultPanel results={run.results} />
+    </>
+  );
+}
+
+/** The run button plus whatever the run produced, for short screens. */
+export function RunSection(props: { title: string; onPress: () => void; disabled?: boolean; run: RunState }) {
+  return (
+    <>
+      <RunButton {...props} />
+      <RunOutput run={props.run} />
     </>
   );
 }
