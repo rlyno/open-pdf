@@ -1,11 +1,11 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
 import { INK_COLORS, INK_WIDTH, SignaturePad } from '@/components/signature-pad';
-import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow } from '@/components/ui';
+import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { outName, type PdfSource, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
@@ -324,7 +324,6 @@ export function MetadataTool({ initial }: ToolProps) {
 }
 
 function MetadataForm({ source: s }: { source: PdfSource }) {
-  const theme = useTheme();
   const run = useToolRun();
   const [meta, setMeta] = useState<ops.Metadata>(() => ({
     title: s.info.title,
@@ -353,8 +352,8 @@ function MetadataForm({ source: s }: { source: PdfSource }) {
           ['Producer', s.info.producer || '—'],
         ].map(([k, v]) => (
           <View key={k} style={styles.infoRow}>
-            <Text style={{ color: theme.textSecondary }}>{k}</Text>
-            <Text style={{ color: theme.text, flexShrink: 1, textAlign: 'right' }}>{v}</Text>
+            <Txt variant="bodyMd" color="textSecondary">{k}</Txt>
+            <Txt variant="labelLg" style={{ flexShrink: 1, textAlign: 'right' }}>{v}</Txt>
           </View>
         ))}
       </Card>

@@ -3,8 +3,8 @@ import { router } from 'expo-router';
 import { memo } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { Body, Button, Card, ErrorBanner, IconBadge, Label } from '@/components/ui';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Button, Card, ErrorBanner, IconBadge, Label, Pill, SymbolIcon, Txt } from '@/components/ui';
+import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { usePageThumbs, type PdfSource } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { exportFile, formatBytes, shareFile, type OutputFile } from '@/lib/files';
@@ -22,7 +22,7 @@ export async function saveWithFeedback(file: OutputFile) {
   }
 }
 
-/** Shows the chosen PDF, or a prompt to choose one. */
+/** Shows the chosen PDF ("active document"), or a prompt to choose one. */
 export function SourceCard({
   source,
   onPick,
@@ -37,28 +37,37 @@ export function SourceCard({
   const theme = useTheme();
   if (!source) {
     return (
-      <Card>
-        <Body secondary>{t('Pilih file PDF dari perangkat. Semua proses berjalan di HP kamu, tanpa upload.')}</Body>
-        <Button title={t('Pilih PDF')} icon={{ ios: 'doc.badge.plus', android: 'upload_file' }} onPress={onPick} loading={loading} />
+      <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+        <IconBadge icon={{ ios: 'doc.badge.plus', android: 'upload_file' }} color={theme.accent} size={52} />
+        <Txt variant="titleSm" style={{ textAlign: 'center' }}>
+          {t('Pilih dokumen PDF')}
+        </Txt>
+        <Txt variant="bodyMd" color="textSecondary" style={{ textAlign: 'center' }}>
+          {t('Pilih file PDF dari perangkat. Semua proses berjalan di HP kamu, tanpa upload.')}
+        </Txt>
+        <View style={{ alignSelf: 'stretch' }}>
+          <Button title={t('Pilih PDF')} onPress={onPick} loading={loading} />
+        </View>
         {error && <ErrorBanner message={error} />}
-      </Card>
+      </View>
     );
   }
   const { info } = source;
   return (
-    <Card>
+    <Card style={{ padding: 12 }}>
       <View style={styles.fileRow}>
-        <IconBadge icon={PDF_ICON} color={theme.accent} />
-        <View style={{ flex: 1 }}>
-          <Text numberOfLines={2} style={[styles.fileName, { color: theme.text }]}>
+        <IconBadge icon={PDF_ICON} color={theme.accent} size={40} solid />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Label>{t('Dokumen aktif')}</Label>
+          <Txt variant="titleSm" numberOfLines={1}>
             {source.name}
-          </Text>
-          <Text style={{ color: theme.textSecondary }}>
-            {t('{n} halaman', { n: info.pageCount })} · {formatBytes(source.size)}
-            {info.encrypted ? ` · ${t('terkunci')}` : ''}
-          </Text>
+          </Txt>
+          <View style={styles.pills}>
+            <Pill tone="neutral" label={`${t('{n} halaman', { n: info.pageCount })} · ${formatBytes(source.size)}`} />
+            {info.encrypted && <Pill tone="danger" label={t('terkunci')} />}
+          </View>
         </View>
-        <Button title={t('Ganti')} variant="secondary" compact onPress={onPick} loading={loading} />
+        <Button title={t('Ganti')} variant="ghost" compact onPress={onPick} loading={loading} />
       </View>
       {error && <ErrorBanner message={error} />}
     </Card>
@@ -67,7 +76,8 @@ export function SourceCard({
 
 /**
  * Thumbnail grid. Tapping a page calls `onPress`; `badge` and `rotation`
- * decorate each page (selection number, preview rotation).
+ * decorate each page (selection number, preview rotation). `tone` colours
+ * the selection: indigo by default, crimson for pages about to be removed.
  */
 export function PageGrid({
   source,
@@ -76,6 +86,7 @@ export function PageGrid({
   badge,
   rotation,
   pages,
+  tone = 'accent',
 }: {
   source: PdfSource;
   selected?: (index: number) => boolean;
@@ -84,6 +95,7 @@ export function PageGrid({
   rotation?: (index: number) => number;
   /** Which source pages to show, in order. Defaults to all. */
   pages?: number[];
+  tone?: 'accent' | 'danger';
 }) {
   const { width } = useWindowDimensions();
   const thumbs = usePageThumbs(source.uri, source.info.pageCount);
@@ -103,6 +115,7 @@ export function PageGrid({
           selected={selected?.(pageIndex) ?? false}
           rotation={rotation?.(pageIndex) ?? 0}
           badge={badge?.(pageIndex)}
+          tone={tone}
           onPress={onPress}
         />
       ))}
@@ -111,8 +124,9 @@ export function PageGrid({
 }
 
 /**
- * One page tile. Memoised with primitive props so a newly rendered thumbnail
- * only re-renders its own tile, not every page of a large document.
+ * One page card: page number top-left, selection mark top-right. Memoised
+ * with primitive props so a newly rendered thumbnail only re-renders its own
+ * card, not every page of a large document.
  */
 const PageCell = memo(function PageCell({
   pageIndex,
@@ -121,6 +135,7 @@ const PageCell = memo(function PageCell({
   selected,
   rotation,
   badge,
+  tone,
   onPress,
 }: {
   pageIndex: number;
@@ -129,51 +144,60 @@ const PageCell = memo(function PageCell({
   selected: boolean;
   rotation: number;
   badge?: string;
+  tone: 'accent' | 'danger';
   onPress?: (index: number) => void;
 }) {
   const theme = useTheme();
+  const toneColor = tone === 'danger' ? theme.danger : theme.accent;
   // A sideways preview swaps its box so it still fits after rotating.
   const sideways = rotation % 180 !== 0;
-  const boxW = size - 8;
-  const boxH = size * 1.5 - 8;
+  const boxW = size - 16;
+  const boxH = size * 1.4 - 16;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t('Halaman {n}', { n: pageIndex + 1 })}
       accessibilityState={{ selected }}
       onPress={() => onPress?.(pageIndex)}
-      style={{ width: size, alignItems: 'center', gap: 4 }}>
-      <View
-        style={[
-          styles.thumb,
-          {
-            width: size,
-            height: size * 1.5,
-            borderColor: selected ? theme.accent : theme.border,
-            borderWidth: selected ? 3 : 1,
-            backgroundColor: theme.background,
-          },
-        ]}>
-        {thumb ? (
-          <Image
-            source={{ uri: thumb }}
-            contentFit="contain"
-            style={{
-              width: sideways ? boxH : boxW,
-              height: sideways ? boxW : boxH,
-              transform: [{ rotate: `${rotation}deg` }],
-            }}
-          />
-        ) : (
-          <Text style={{ color: theme.textSecondary, fontSize: 20, fontWeight: '600' }}>{pageIndex + 1}</Text>
-        )}
-        {badge && (
-          <View style={[styles.badge, { backgroundColor: theme.accent }]}>
-            <Text style={styles.badgeText}>{badge}</Text>
-          </View>
-        )}
+      style={({ pressed }) => [
+        styles.cell,
+        {
+          width: size,
+          height: size * 1.4,
+          backgroundColor: theme.surface,
+          borderColor: selected ? toneColor : theme.border,
+          borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
+        },
+      ]}>
+      {thumb ? (
+        <Image
+          source={{ uri: thumb }}
+          contentFit="contain"
+          style={{
+            width: sideways ? boxH : boxW,
+            height: sideways ? boxW : boxH,
+            transform: [{ rotate: `${rotation}deg` }],
+            opacity: selected && tone === 'danger' ? 0.35 : 1,
+          }}
+        />
+      ) : (
+        <Txt variant="headlineMd" color="textMuted">
+          {pageIndex + 1}
+        </Txt>
+      )}
+      <View style={[styles.pageNo, { backgroundColor: theme.surfaceLowest }]}>
+        <Text style={[Type.labelSm, { color: theme.text }]}>{pageIndex + 1}</Text>
       </View>
-      <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{pageIndex + 1}</Text>
+      {(badge || selected) && (
+        <View style={[styles.mark, { backgroundColor: toneColor }]}>
+          {badge ? (
+            <Text style={[Type.labelSm, { color: theme.accentText }]}>{badge}</Text>
+          ) : (
+            <SymbolIcon icon={{ ios: 'checkmark', android: 'check' }} size={12} color={theme.accentText} />
+          )}
+        </View>
+      )}
     </Pressable>
   );
 });
@@ -183,15 +207,22 @@ export function ResultPanel({ results }: { results: OutputFile[] }) {
   const theme = useTheme();
   if (results.length === 0) return null;
   return (
-    <Card style={{ borderWidth: 1, borderColor: theme.success }}>
-      <Label>{results.length > 1 ? t('Selesai · {n} file', { n: results.length }) : t('Selesai')}</Label>
+    <Card style={{ borderColor: theme.success, borderWidth: 1 }}>
+      <View style={styles.resultHead}>
+        <SymbolIcon icon={{ ios: 'checkmark.circle.fill', android: 'check_circle' }} size={20} color={theme.success} />
+        <Txt variant="titleSm" style={{ flex: 1 }}>
+          {results.length > 1 ? t('Selesai · {n} file', { n: results.length }) : t('Selesai')}
+        </Txt>
+      </View>
       {results.map((r) => (
-        <View key={r.uri} style={styles.resultRow}>
+        <View key={r.uri} style={[styles.resultRow, { backgroundColor: theme.surfaceLowest }]}>
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={1} style={[styles.fileName, { color: theme.text }]}>
+            <Txt variant="labelLg" numberOfLines={1}>
               {r.name}
-            </Text>
-            <Text style={{ color: theme.textSecondary }}>{formatBytes(r.size)}</Text>
+            </Txt>
+            <Txt variant="bodySm" color="textMuted">
+              {formatBytes(r.size)}
+            </Txt>
           </View>
           <Button
             title={t('Bagikan')}
@@ -208,29 +239,48 @@ export function ResultPanel({ results }: { results: OutputFile[] }) {
           />
         </View>
       ))}
-      <Button title={t('Lihat semua file')} variant="secondary" onPress={() => router.navigate('/files')} />
+      <Button title={t('Lihat semua file')} variant="ghost" compact onPress={() => router.navigate('/')} />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  fileName: { fontSize: 16, fontWeight: '600' },
+  empty: {
+    borderRadius: Radius.xl,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    padding: Spacing.four,
+    alignItems: 'center',
+    gap: Spacing.two + 4,
+  },
+  fileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pills: { flexDirection: 'row', gap: 6, marginTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  thumb: { borderRadius: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  badge: {
+  cell: { borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  pageNo: {
     position: 'absolute',
     top: 6,
-    right: 6,
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    paddingHorizontal: 6,
+    left: 6,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  mark: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderRadius: Radius.lg, padding: 10 },
 });
 
 type RunState = { busy: boolean; error: string | null; results: OutputFile[] };

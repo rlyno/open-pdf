@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { Button } from '@/components/ui';
+import { Button, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { t } from '@/lib/i18n';
@@ -55,11 +55,11 @@ export function SignaturePad({
       <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" onPress={onCancel} hitSlop={12}>
-            <Text style={{ color: theme.textSecondary, fontSize: 16 }}>{t('Batal')}</Text>
+            <Txt variant="bodyLg" color="textSecondary">{t('Batal')}</Txt>
           </Pressable>
-          <Text style={[styles.title, { color: theme.text }]}>{t('Gambar tanda tangan')}</Text>
+          <Txt variant="titleSm">{t('Gambar tanda tangan')}</Txt>
           <Pressable accessibilityRole="button" onPress={() => setStrokes([])} hitSlop={12}>
-            <Text style={{ color: theme.accent, fontSize: 16 }}>{t('Hapus')}</Text>
+            <Txt variant="labelLg" style={{ color: theme.accentOnSurface }}>{t('Hapus')}</Txt>
           </Pressable>
         </View>
         <View
@@ -93,9 +93,9 @@ export function SignaturePad({
             />
           </Svg>
           {strokes.length === 0 && (
-            <Text pointerEvents="none" style={[styles.hint, { color: '#9a9a9a' }]}>
+            <Txt variant="bodyLg" pointerEvents="none" style={{ color: '#9a9a9a' }}>
               {t('Tanda tangan di sini')}
-            </Text>
+            </Txt>
           )}
           <View pointerEvents="none" style={styles.baseline} />
         </View>
@@ -130,7 +130,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
-  title: { fontSize: 17, fontWeight: '700' },
   pad: {
     flex: 1,
     marginHorizontal: Spacing.three,
@@ -141,7 +140,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  hint: { fontSize: 18 },
   baseline: {
     position: 'absolute',
     left: 24,

@@ -30,14 +30,21 @@ export type ToolDef = {
   description: string;
   category: CategoryId;
   icon: { ios: SFSymbol; android: AndroidSymbol };
+  /** Short capability tag shown on the tool card. */
+  badge: string;
+  badgeTone?: 'accent' | 'neutral' | 'danger';
+  /** One-line detail under the description. */
+  feature: string;
+  /** Shown in the File hub's quick tools. */
+  quick?: boolean;
   keywords?: string;
 };
 
 export const CATEGORIES: { id: CategoryId; title: string; color: string }[] = [
-  { id: 'organize', title: 'Atur', color: '#2F6FEB' },
-  { id: 'convert', title: 'Konversi', color: '#1A9A6C' },
-  { id: 'edit', title: 'Edit', color: '#D97706' },
-  { id: 'security', title: 'Keamanan', color: '#D93A3A' },
+  { id: 'organize', title: 'Atur', color: '#818CF8' },
+  { id: 'convert', title: 'Konversi', color: '#38BDF8' },
+  { id: 'edit', title: 'Edit', color: '#F59E0B' },
+  { id: 'security', title: 'Keamanan', color: '#F87171' },
 ];
 
 export const TOOLS: ToolDef[] = [
@@ -48,6 +55,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Satukan beberapa PDF menjadi satu file',
     category: 'organize',
     icon: { ios: 'square.stack.3d.down.right', android: 'call_merge' },
+    badge: 'Banyak file',
+    feature: 'Atur urutan sebelum digabung',
+    quick: true,
     keywords: 'merge combine join',
   },
   {
@@ -57,6 +67,8 @@ export const TOOLS: ToolDef[] = [
     description: 'Pecah PDF per rentang atau tiap N halaman',
     category: 'organize',
     icon: { ios: 'scissors', android: 'content_cut' },
+    badge: 'Rentang',
+    feature: 'Mendukung sintaks 1-3, 5, 8-',
     keywords: 'split separate',
   },
   {
@@ -66,6 +78,8 @@ export const TOOLS: ToolDef[] = [
     description: 'Urutkan, ambil, atau duplikat halaman',
     category: 'organize',
     icon: { ios: 'square.grid.2x2', android: 'grid_view' },
+    badge: 'Visual',
+    feature: 'Ketuk halaman untuk menyusun urutan baru',
     keywords: 'reorder extract sort move',
   },
   {
@@ -75,6 +89,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Putar semua atau sebagian halaman',
     category: 'organize',
     icon: { ios: 'rotate.right', android: 'rotate_right' },
+    badge: '90° · 180°',
+    badgeTone: 'neutral',
+    feature: 'Semua halaman atau pilih sendiri',
     keywords: 'rotate',
   },
   {
@@ -84,6 +101,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Buang halaman yang tidak diperlukan',
     category: 'organize',
     icon: { ios: 'trash', android: 'delete' },
+    badge: 'Pratinjau',
+    badgeTone: 'neutral',
+    feature: 'Pilih langsung dari thumbnail',
     keywords: 'delete remove',
   },
   {
@@ -93,6 +113,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Cetak 2 atau 4 halaman per lembar',
     category: 'organize',
     icon: { ios: 'rectangle.split.2x2', android: 'view_module' },
+    badge: 'A4',
+    badgeTone: 'neutral',
+    feature: 'Hemat kertas saat mencetak',
     keywords: 'n-up layout booklet',
   },
   {
@@ -102,6 +125,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Ubah foto atau scan menjadi PDF',
     category: 'convert',
     icon: { ios: 'photo.on.rectangle', android: 'image' },
+    badge: 'JPG · PNG · HEIC',
+    feature: 'Ukuran A4, Letter, atau sesuai gambar',
+    quick: true,
     keywords: 'image jpg png photo scan',
   },
   {
@@ -111,6 +137,8 @@ export const TOOLS: ToolDef[] = [
     description: 'Ekspor halaman menjadi JPEG',
     category: 'convert',
     icon: { ios: 'photo.stack', android: 'photo_library' },
+    badge: 'Hingga 300 dpi',
+    feature: 'Banyak halaman dikemas jadi ZIP',
     keywords: 'image jpg export',
   },
   {
@@ -120,6 +148,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Perkecil ukuran file',
     category: 'convert',
     icon: { ios: 'arrow.down.right.and.arrow.up.left', android: 'compress' },
+    badge: '2 metode',
+    feature: 'Tanpa kehilangan atau maksimal',
+    quick: true,
     keywords: 'compress optimize reduce size',
   },
   {
@@ -129,6 +160,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Tambahkan teks watermark',
     category: 'edit',
     icon: { ios: 'drop', android: 'water_drop' },
+    badge: 'Teks',
+    badgeTone: 'neutral',
+    feature: 'Di tengah atau diulang',
     keywords: 'stamp watermark',
   },
   {
@@ -138,6 +172,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Beri nomor di setiap halaman',
     category: 'edit',
     icon: { ios: 'number', android: 'format_list_numbered' },
+    badge: '6 posisi',
+    badgeTone: 'neutral',
+    feature: 'Format "Halaman 1 dari N"',
     keywords: 'page numbers',
   },
   {
@@ -147,6 +184,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Tempel tanda tangan atau stempel',
     category: 'edit',
     icon: { ios: 'signature', android: 'draw' },
+    badge: 'Vektor',
+    feature: 'Gambar dengan jari atau dari foto',
+    quick: true,
     keywords: 'sign signature stamp image',
   },
   {
@@ -156,6 +196,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Lihat dan ubah judul, penulis, dll.',
     category: 'edit',
     icon: { ios: 'info.circle', android: 'info' },
+    badge: 'Edit',
+    badgeTone: 'neutral',
+    feature: 'Judul, penulis, kata kunci',
     keywords: 'metadata properties info title author',
   },
   {
@@ -165,6 +208,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Kunci isian formulir agar tidak bisa diubah',
     category: 'edit',
     icon: { ios: 'square.3.layers.3d.down.right', android: 'layers' },
+    badge: 'Permanen',
+    badgeTone: 'danger',
+    feature: 'Isian formulir jadi bagian halaman',
     keywords: 'flatten form',
   },
   {
@@ -174,6 +220,8 @@ export const TOOLS: ToolDef[] = [
     description: 'Enkripsi PDF dengan AES-256',
     category: 'security',
     icon: { ios: 'lock', android: 'lock' },
+    badge: 'AES-256',
+    feature: 'Atur izin cetak dan salin',
     keywords: 'password encrypt protect',
   },
   {
@@ -183,6 +231,9 @@ export const TOOLS: ToolDef[] = [
     description: 'Buka PDF terkunci (butuh password)',
     category: 'security',
     icon: { ios: 'lock.open', android: 'lock_open' },
+    badge: 'Butuh password',
+    badgeTone: 'neutral',
+    feature: 'Hapus enkripsi dari PDF milikmu',
     keywords: 'unlock decrypt remove password',
   },
 ];

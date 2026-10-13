@@ -1,57 +1,81 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Design tokens, following the "Precision PDF Utility" design: a low-glare
+ * slate/navy surface stack with an electric-indigo accent and crimson
+ * reserved for destructive actions. Dark is the reference; light mirrors it.
  */
-
-import { Platform } from 'react-native';
-
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    border: '#E4E5EA',
-    accent: '#E5483B',
-    accentText: '#ffffff',
-    danger: '#D93A3A',
-    success: '#1A9A6C',
-  },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    border: '#2E3135',
-    accent: '#FF5A4C',
-    accentText: '#ffffff',
-    danger: '#FF6B6B',
-    success: '#3CC48F',
+    background: '#0B1326',
+    surface: '#171F33',
+    surfaceHigh: '#222A3D',
+    /** Inset fields and pills. */
+    surfaceLowest: '#060E20',
+    text: '#DAE2FD',
+    textSecondary: '#C5C6CD',
+    textMuted: '#8F9097',
+    border: 'rgba(255,255,255,0.08)',
+    accent: '#4F46E5',
+    accentText: '#FFFFFF',
+    /** Indigo tint for selected chips, badges and icon tiles. */
+    accentSoft: 'rgba(79,70,229,0.22)',
+    /** Readable indigo on dark surfaces (links, eyebrows, active labels). */
+    accentOnSurface: '#C3C0FF',
+    danger: '#DC2626',
+    dangerText: '#FFB4AB',
+    dangerSoft: 'rgba(220,38,38,0.18)',
+    success: '#4ADE80',
+    successSoft: 'rgba(74,222,128,0.14)',
+    /** Floating chrome (tab bar) over content. */
+    chrome: 'rgba(23,31,51,0.985)',
+  },
+  light: {
+    background: '#F3F5FA',
+    surface: '#FFFFFF',
+    surfaceHigh: '#E9EDF5',
+    surfaceLowest: '#E4E9F2',
+    text: '#0F172A',
+    textSecondary: '#475569',
+    textMuted: '#64748B',
+    border: 'rgba(15,23,42,0.08)',
+    accent: '#4F46E5',
+    accentText: '#FFFFFF',
+    accentSoft: 'rgba(79,70,229,0.10)',
+    accentOnSurface: '#4338CA',
+    danger: '#DC2626',
+    dangerText: '#B91C1C',
+    dangerSoft: 'rgba(220,38,38,0.08)',
+    success: '#15803D',
+    successSoft: 'rgba(21,128,61,0.10)',
+    chrome: 'rgba(255,255,255,0.985)',
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type Palette = { [K in keyof typeof Colors.dark]: string };
+export type ThemeColor = keyof Palette;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-});
+/** Inter, loaded in the root layout. Custom fonts pick weight by family. */
+export const Font = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
+
+/** Type scale from the design system (sizes in points). */
+export const Type = {
+  headlineXl: { fontFamily: Font.bold, fontSize: 26, lineHeight: 32, letterSpacing: -0.5 },
+  headlineLg: { fontFamily: Font.semibold, fontSize: 24, lineHeight: 30, letterSpacing: -0.36 },
+  headlineMd: { fontFamily: Font.semibold, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+  titleSm: { fontFamily: Font.semibold, fontSize: 16, lineHeight: 22, letterSpacing: -0.08 },
+  bodyLg: { fontFamily: Font.regular, fontSize: 16, lineHeight: 24 },
+  bodyMd: { fontFamily: Font.regular, fontSize: 14, lineHeight: 20 },
+  bodySm: { fontFamily: Font.regular, fontSize: 12, lineHeight: 16 },
+  labelLg: { fontFamily: Font.semibold, fontSize: 14, lineHeight: 18, letterSpacing: 0.14 },
+  labelMd: { fontFamily: Font.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0.18 },
+  labelSm: { fontFamily: Font.semibold, fontSize: 10, lineHeight: 14, letterSpacing: 0.3 },
+} as const;
+
+export const Radius = { sm: 4, md: 8, lg: 12, xl: 16, full: 999 } as const;
 
 export const Spacing = {
   half: 2,
@@ -63,5 +87,6 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** Clearance so content can scroll past the floating tab bar. */
+export const TabBarClearance = 96;
 export const MaxContentWidth = 800;

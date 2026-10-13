@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { zipSync } from 'fflate';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { RunSection, SourceCard } from '@/components/pdf-parts';
-import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented } from '@/components/ui';
+import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { messageOf, outName, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
@@ -64,9 +64,9 @@ export function ImagesToPdfTool({ initial }: ToolProps) {
         {images.map((img, i) => (
           <View key={`${img.uri}-${i}`} style={styles.row}>
             <Image source={{ uri: img.uri }} style={[styles.thumb, { backgroundColor: theme.background }]} contentFit="cover" />
-            <Text style={{ flex: 1, color: theme.text }} numberOfLines={1}>
+            <Txt variant="labelLg" style={{ flex: 1 }} numberOfLines={1}>
               {i + 1}. {img.name}
-            </Text>
+            </Txt>
             <Button title="↑" compact variant="secondary" disabled={i === 0} onPress={() => move(i, -1)} />
             <Button title="↓" compact variant="secondary" disabled={i === images.length - 1} onPress={() => move(i, 1)} />
             <Button title="✕" compact variant="secondary" onPress={() => setImages((x) => x.filter((_, k) => k !== i))} />
@@ -230,14 +230,14 @@ export function CompressTool({ initial }: ToolProps) {
       {s && result && (
         <Card>
           <Label>{t('Hasil')}</Label>
-          <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>
+          <Txt variant="headlineMd" style={{ fontVariant: ['tabular-nums'] }}>
             {formatBytes(s.size)} → {formatBytes(result.size)}
-          </Text>
-          <Text style={{ color: result.size < s.size ? theme.success : theme.danger }}>
+          </Txt>
+          <Txt variant="labelLg" style={{ color: result.size < s.size ? theme.success : theme.dangerText }}>
             {result.size < s.size
               ? t('Lebih kecil {pct}%', { pct: Math.round((1 - result.size / s.size) * 100) })
               : t('File sudah optimal; hasil tidak lebih kecil. Coba metode Maksimal.')}
-          </Text>
+          </Txt>
         </Card>
       )}
       <RunSection

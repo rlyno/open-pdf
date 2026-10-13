@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PageGrid, RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
-import { Body, Button, Card, Field, Label, Screen, Segmented, Stepper } from '@/components/ui';
+import { Body, Button, Card, Field, Label, Screen, Segmented, Stepper, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { outName, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
-import { useTheme } from '@/hooks/use-theme';
 import { baseName, formatBytes, pickPdfs, readBytes, type PickedFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
 import * as ops from '@/lib/pdf/ops';
 
 export function MergeTool({ initial }: ToolProps) {
-  const theme = useTheme();
   const [files, setFiles] = useState<PickedFile[]>(initial ?? []);
   const run = useToolRun();
 
@@ -33,12 +31,12 @@ export function MergeTool({ initial }: ToolProps) {
         {files.length === 0 && <Body secondary>{t('Tambahkan dua file PDF atau lebih. Urutan di bawah = urutan hasil.')}</Body>}
         {files.map((f, i) => (
           <View key={`${f.uri}-${i}`} style={styles.listRow}>
-            <Text style={[styles.index, { color: theme.textSecondary }]}>{i + 1}</Text>
+            <Txt variant="labelLg" color="textMuted" style={styles.index}>{i + 1}</Txt>
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>
+              <Txt variant="labelLg" numberOfLines={1}>
                 {f.name}
-              </Text>
-              <Text style={{ color: theme.textSecondary }}>{formatBytes(f.size)}</Text>
+              </Txt>
+              <Txt variant="bodySm" color="textMuted">{formatBytes(f.size)}</Txt>
             </View>
             <Button title="↑" compact variant="secondary" disabled={i === 0} onPress={() => move(i, -1)} />
             <Button title="↓" compact variant="secondary" disabled={i === files.length - 1} onPress={() => move(i, 1)} />
@@ -121,7 +119,6 @@ export function SplitTool({ initial }: ToolProps) {
 
 /** Builds a new page order by tapping pages; tap again to remove. */
 export function OrganizeTool({ initial }: ToolProps) {
-  const theme = useTheme();
   const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [order, setOrder] = useState<number[]>([]);
@@ -158,11 +155,11 @@ export function OrganizeTool({ initial }: ToolProps) {
               <Button title={t('Genap')} compact variant="secondary" onPress={() => setOrder(all.filter((i) => i % 2 === 1))} />
               <Button title={t('Reset')} compact variant="secondary" onPress={() => setOrder([])} />
             </View>
-            <Text style={{ color: theme.textSecondary }}>
+            <Txt variant="bodyMd" color="textSecondary">
               {order.length
                 ? t('Urutan baru: {pages}', { pages: order.map((i) => i + 1).join(', ') })
                 : t('Belum ada halaman dipilih.')}
-            </Text>
+            </Txt>
           </Card>
           <PageGrid
             source={s}
@@ -326,6 +323,6 @@ export function NUpTool({ initial }: ToolProps) {
 
 const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  index: { width: 20, fontWeight: '700', textAlign: 'center' },
+  index: { width: 20, textAlign: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 });

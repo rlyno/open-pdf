@@ -1,7 +1,12 @@
 import { getLocales } from 'expo-localization';
 
-import { setLocale } from '@/lib/i18n';
+import { setLocale, type Locale } from '@/lib/i18n';
+import { getPrefs, type LanguagePref } from '@/lib/prefs';
 
-// Indonesian devices get Indonesian; everyone else gets English. Read once at
-// startup, so changing the device language takes effect on the next launch.
-setLocale(getLocales()[0]?.languageCode === 'id' ? 'id' : 'en');
+/** Indonesian devices get Indonesian, everyone else English, unless overridden. */
+export function resolveLocale(pref: LanguagePref): Locale {
+  if (pref !== 'system') return pref;
+  return getLocales()[0]?.languageCode === 'id' ? 'id' : 'en';
+}
+
+setLocale(resolveLocale(getPrefs().language));

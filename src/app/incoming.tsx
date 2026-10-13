@@ -1,16 +1,17 @@
 import { router, Stack } from 'expo-router';
 import { useIncomingShare } from 'expo-sharing';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { Body, Card, ErrorBanner, IconBadge, Label, Screen } from '@/components/ui';
+import { ToolRow } from '@/components/tool-card';
+import { Body, Card, ErrorBanner, IconBadge, Label, Pill, Screen, SectionHeader, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { messageOf } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, importIncoming, type PickedFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
-import { clearPendingUri, peekPendingUri } from '@/lib/incoming';
-import { categoryColor, toolsFor, type ToolDef } from '@/lib/tools';
+import { clearPendingFiles, clearPendingUri, peekPendingFiles, peekPendingUri } from '@/lib/incoming';
+import { toolsFor, type ToolDef } from '@/lib/tools';
 
 type Incoming = { uri: string; name: string | null; mimeType: string | null };
 type Received = { pdfs: PickedFile[]; images: PickedFile[]; skipped: number };
@@ -22,8 +23,22 @@ const isImage = (f: Incoming) => !!f.mimeType?.startsWith('image/') || /\.(jpe?g
 export default function IncomingScreen() {
   const theme = useTheme();
   const [uri] = useState(peekPendingUri);
+  // Files picked inside the app are already local; no import needed.
+  const [preset] = useState(peekPendingFiles);
   const share = useIncomingShare();
-  const [received, setReceived] = useState<Received | null>(null);
+  const [received, setReceived] = useState<Received | null>(() =>
+    preset.length
+      ? {
+          pdfs: preset.filter((f) => /\.pdf$/i.test(f.name)),
+          images: preset.filter((f) => !/\.pdf$/i.test(f.name)),
+          skipped: 0,
+        }
+      : null
+  );
+
+  useEffect(() => {
+    if (preset.length) clearPendingFiles();
+  }, [preset]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
 
@@ -103,31 +118,33 @@ export default function IncomingScreen() {
 
       {images.length > 0 && (
         <>
-          <Label>{t('{n} gambar', { n: images.length })}</Label>
+          <SectionHeader title={t('{n} gambar', { n: images.length })} />
           <ToolList tools={toolsFor('images')} onPress={(tool) => open(tool, images)} />
         </>
       )}
 
       {pdfs.length > 1 && (
         <>
-          <Label>{t('{n} PDF', { n: pdfs.length })}</Label>
+          <SectionHeader title={t('{n} PDF', { n: pdfs.length })} />
           <ToolList tools={toolsFor('pdfs')} onPress={(tool) => open(tool, pdfs)} />
           <Label>{t('Atau pilih satu file')}</Label>
-          <Card style={{ gap: Spacing.two }}>
+          <Card style={{ gap: 4, padding: Spacing.two }}>
             {pdfs.map((f, i) => (
               <Pressable
                 key={f.uri}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: i === selected }}
                 onPress={() => setSelected(i)}
-                style={styles.fileRow}>
-                <View style={[styles.radio, { borderColor: i === selected ? theme.accent : theme.border }]}>
+                style={[styles.fileRow, i === selected && { backgroundColor: theme.accentSoft }]}>
+                <View style={[styles.radio, { borderColor: i === selected ? theme.accent : theme.textMuted }]}>
                   {i === selected && <View style={[styles.radioDot, { backgroundColor: theme.accent }]} />}
                 </View>
-                <Text numberOfLines={1} style={{ flex: 1, color: theme.text }}>
+                <Txt variant="labelLg" numberOfLines={1} style={{ flex: 1 }}>
                   {f.name}
-                </Text>
-                <Text style={{ color: theme.textSecondary }}>{formatBytes(f.size)}</Text>
+                </Txt>
+                <Txt variant="bodySm" color="textMuted">
+                  {formatBytes(f.size)}
+                </Txt>
               </Pressable>
             ))}
           </Card>
@@ -136,11 +153,16 @@ export default function IncomingScreen() {
 
       {current && (
         <>
-          <Label>
-            {pdfs.length > 1
-              ? t('Alat untuk {name}', { name: current.name })
-              : `${current.name} · ${formatBytes(current.size)}`}
-          </Label>
+          <Card style={styles.active}>
+            <IconBadge icon={{ ios: 'doc.fill', android: 'picture_as_pdf' }} color={theme.accent} size={40} solid />
+            <View style={{ flex: 1 }}>
+              <Label>{pdfs.length > 1 ? t('File terpilih') : t('Dokumen aktif')}</Label>
+              <Txt variant="titleSm" numberOfLines={1}>
+                {current.name}
+              </Txt>
+            </View>
+            <Pill tone="neutral" label={formatBytes(current.size)} />
+          </Card>
           <ToolList tools={toolsFor('pdf')} onPress={(tool) => open(tool, [current])} />
         </>
       )}
@@ -149,22 +171,10 @@ export default function IncomingScreen() {
 }
 
 function ToolList({ tools, onPress }: { tools: ToolDef[]; onPress: (tool: ToolDef) => void }) {
-  const theme = useTheme();
   return (
-    <Card style={{ padding: Spacing.two, gap: 0 }}>
+    <Card style={{ padding: Spacing.one, gap: 0 }}>
       {tools.map((tool) => (
-        <Pressable
-          key={tool.id}
-          accessibilityRole="button"
-          accessibilityLabel={`${t(tool.title)}. ${t(tool.description)}`}
-          onPress={() => onPress(tool)}
-          style={({ pressed }) => [styles.toolRow, { opacity: pressed ? 0.6 : 1 }]}>
-          <IconBadge icon={tool.icon} color={categoryColor(tool.category)} size={36} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '600', fontSize: 16 }}>{t(tool.title)}</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t(tool.description)}</Text>
-          </View>
-        </Pressable>
+        <ToolRow key={tool.id} tool={tool} onPress={() => onPress(tool)} />
       ))}
     </Card>
   );
@@ -172,8 +182,8 @@ function ToolList({ tools, onPress }: { tools: ToolDef[]; onPress: (tool: ToolDe
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  toolRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, padding: Spacing.two },
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 40 },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  active: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  fileRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44, borderRadius: 10, paddingHorizontal: 8 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
 });

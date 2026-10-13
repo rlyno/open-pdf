@@ -22,7 +22,7 @@ export function collectKeys(srcDir: string): Set<string> {
     for (const m of code.matchAll(/\bt\(\s*'((?:[^'\\]|\\.)*)'/g)) keys.add(unquote(m[1]));
     for (const m of code.matchAll(/outName\([^,]+,\s*'((?:[^'\\]|\\.)*)'/g)) keys.add(unquote(m[1]));
     if (file.endsWith(join('lib', 'tools.ts'))) {
-      for (const m of code.matchAll(/^\s+(?:title|description): '((?:[^'\\]|\\.)*)'/gm)) keys.add(unquote(m[1]));
+      for (const m of code.matchAll(/^\s+(?:title|description|badge|feature): '((?:[^'\\]|\\.)*)'/gm)) keys.add(unquote(m[1]));
       for (const m of code.matchAll(/title: '((?:[^'\\]|\\.)*)', color/g)) keys.add(unquote(m[1]));
     }
   }

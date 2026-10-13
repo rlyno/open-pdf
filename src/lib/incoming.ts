@@ -1,3 +1,5 @@
+import type { PickedFile } from '@/lib/files';
+
 /**
  * Holds a document URI handed to the app via "Open with", exactly as the OS
  * gave it. It must not travel through a route param: the router decodes
@@ -16,4 +18,20 @@ export function peekPendingUri() {
 
 export function clearPendingUri() {
   pending = null;
+}
+
+
+/** Files already in app storage (e.g. picked via the File hub's + button). */
+let pendingFiles: PickedFile[] = [];
+
+export function setPendingFiles(files: PickedFile[]) {
+  pendingFiles = files;
+}
+
+export function peekPendingFiles() {
+  return pendingFiles;
+}
+
+export function clearPendingFiles() {
+  pendingFiles = [];
 }
