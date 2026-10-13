@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ToolRow } from '@/components/tool-card';
-import { Body, Card, ErrorBanner, IconBadge, Label, Pill, Screen, SectionHeader, Txt } from '@/components/ui';
+import { Body, Button, Card, ErrorBanner, IconBadge, Label, Screen, SectionHeader, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { messageOf } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBytes, importIncoming, type PickedFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
 import { clearPendingFiles, clearPendingUri, peekPendingFiles, peekPendingUri } from '@/lib/incoming';
+import { openViewer } from '@/lib/navigation';
 import { toolsFor, type ToolDef } from '@/lib/tools';
 
 type Incoming = { uri: string; name: string | null; mimeType: string | null };
@@ -161,7 +162,7 @@ export default function IncomingScreen() {
                 {current.name}
               </Txt>
             </View>
-            <Pill tone="neutral" label={formatBytes(current.size)} />
+            <Button title={t('Lihat')} compact variant="secondary" icon={{ ios: 'eye', android: 'visibility' }} onPress={() => openViewer(current)} />
           </Card>
           <ToolList tools={toolsFor('pdf')} onPress={(tool) => open(tool, [current])} />
         </>

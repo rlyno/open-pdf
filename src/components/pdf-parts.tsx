@@ -9,6 +9,7 @@ import { usePageThumbs, type PdfSource } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { exportFile, formatBytes, shareFile, type OutputFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
+import { openViewer } from '@/lib/navigation';
 
 const PDF_ICON = { ios: 'doc.fill', android: 'picture_as_pdf' } as const;
 
@@ -216,14 +217,19 @@ export function ResultPanel({ results }: { results: OutputFile[] }) {
       </View>
       {results.map((r) => (
         <View key={r.uri} style={[styles.resultRow, { backgroundColor: theme.surfaceLowest }]}>
-          <View style={{ flex: 1 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint={r.mimeType === 'application/pdf' ? t('Ketuk untuk melihat') : undefined}
+            disabled={r.mimeType !== 'application/pdf'}
+            onPress={() => openViewer(r)}
+            style={{ flex: 1 }}>
             <Txt variant="labelLg" numberOfLines={1}>
               {r.name}
             </Txt>
             <Txt variant="bodySm" color="textMuted">
-              {formatBytes(r.size)}
+              {r.mimeType === 'application/pdf' ? `${formatBytes(r.size)} · ${t('Ketuk untuk melihat')}` : formatBytes(r.size)}
             </Txt>
-          </View>
+          </Pressable>
           <Button
             title={t('Bagikan')}
             compact

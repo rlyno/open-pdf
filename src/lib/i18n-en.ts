@@ -61,6 +61,13 @@ export const EN: Record<string, string> = {
   'Dokumen aktif': 'Active document',
   'Pilih dokumen PDF': 'Choose a PDF document',
 
+  // Viewer
+  Lihat: 'View',
+  Lainnya: 'More',
+  'Tanda tangan': 'Sign',
+  'Ketuk untuk memperbesar': 'Tap to zoom',
+  'Ketuk untuk melihat': 'Tap to view',
+
   // Tool badges and feature lines
   'Banyak file': 'Multi-file',
   'Atur urutan sebelum digabung': 'Set the order before merging',

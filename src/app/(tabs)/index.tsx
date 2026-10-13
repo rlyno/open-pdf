@@ -16,6 +16,7 @@ import { deleteOutput, formatBytes, listOutputs, pickPdfs, shareFile, type Outpu
 import { relativeTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { setPendingFiles } from '@/lib/incoming';
+import { openViewer } from '@/lib/navigation';
 import { canRender, renderPage } from '@/lib/render';
 import { TOOLS } from '@/lib/tools';
 
@@ -82,7 +83,10 @@ export default function FilesScreen() {
   const fileActions: SheetAction[] = menuFor
     ? [
         ...(kindOf(menuFor) === 'pdf'
-          ? [{ label: t('Proses dengan alat…'), icon: { ios: 'wand.and.stars', android: 'auto_fix_high' } as Icon, onPress: () => openWithTool(menuFor) }]
+          ? [
+              { label: t('Lihat'), icon: { ios: 'eye', android: 'visibility' } as Icon, onPress: () => openViewer(menuFor) },
+              { label: t('Proses dengan alat…'), icon: { ios: 'wand.and.stars', android: 'auto_fix_high' } as Icon, onPress: () => openWithTool(menuFor) },
+            ]
           : []),
         { label: t('Bagikan'), icon: { ios: 'square.and.arrow.up', android: 'share' }, onPress: () => shareFile(menuFor) },
         { label: t('Simpan ke perangkat'), icon: { ios: 'square.and.arrow.down', android: 'download' }, onPress: () => saveWithFeedback(menuFor) },
@@ -203,7 +207,14 @@ export default function FilesScreen() {
             {t('Tidak ada file yang cocok.')}
           </Txt>
         ) : (
-          shown.map((f) => <FileRow key={f.uri} file={f} onMenu={() => setMenuFor(f)} />)
+          shown.map((f) => (
+            <FileRow
+              key={f.uri}
+              file={f}
+              onOpen={() => (kindOf(f) === 'pdf' ? openViewer(f) : setMenuFor(f))}
+              onMenu={() => setMenuFor(f)}
+            />
+          ))
         )}
       </Screen>
 
@@ -239,7 +250,7 @@ export default function FilesScreen() {
 const thumbCache = new Map<string, string>();
 
 /** Recent document card with a first-page preview for PDFs. */
-function FileRow({ file, onMenu }: { file: OutputFile; onMenu: () => void }) {
+function FileRow({ file, onOpen, onMenu }: { file: OutputFile; onOpen: () => void; onMenu: () => void }) {
   const theme = useTheme();
   const kind = kindOf(file);
   const [thumb, setThumb] = useState(() => thumbCache.get(file.uri));
@@ -262,7 +273,7 @@ function FileRow({ file, onMenu }: { file: OutputFile; onMenu: () => void }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={file.name}
-      onPress={onMenu}
+      onPress={onOpen}
       style={({ pressed }) => [
         styles.fileRow,
         { backgroundColor: theme.surface, borderColor: theme.border, transform: [{ scale: pressed ? 0.98 : 1 }] },

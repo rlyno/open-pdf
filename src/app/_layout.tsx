@@ -12,7 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Font, Type } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
@@ -67,7 +67,7 @@ export default function RootLayout() {
     <ThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       {/* Keyed by language so every translated string re-renders on change. */}
-      <View key={locale} style={{ flex: 1, backgroundColor: theme.background }}>
+      <GestureHandlerRootView key={locale} style={{ flex: 1, backgroundColor: theme.background }}>
         <Stack
           screenOptions={{
             headerBackButtonDisplayMode: 'minimal',
@@ -80,8 +80,9 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="tool/[id]" options={{ title: '' }} />
           <Stack.Screen name="incoming" options={{ title: t('Buka file') }} />
+          <Stack.Screen name="viewer" options={{ title: '' }} />
         </Stack>
-      </View>
+      </GestureHandlerRootView>
     </ThemeProvider>
   );
 }

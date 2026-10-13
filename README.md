@@ -18,6 +18,10 @@ untuk manipulasi PDF, dan PDFKit (iOS) / PdfRenderer (Android) untuk render hala
 
 Hasil disimpan di tab **File**, dan bisa dibagikan atau disimpan ke folder (Android: pemilih folder; iOS: "Simpan ke File").
 
+Ketuk PDF di tab **File** untuk membukanya di **penampil**: halaman di-render tajam sesuai kebutuhan,
+ada penghitung halaman dan strip thumbnail untuk lompat halaman, ketuk halaman untuk memperbesar
+(cubit, geser, ketuk dua kali), dan bilah bawah untuk langsung membuka alat dengan dokumen itu.
+
 PDF dan gambar juga bisa dikirim dari aplikasi lain lewat menu **Bagikan**, atau dibuka dengan
 **"Buka dengan Open PDF"** (Android) / **"Buka di"** (iOS); aplikasi lalu menawarkan alat yang cocok.
 
@@ -30,9 +34,11 @@ terjemahan Inggris ada di `src/lib/i18n-en.ts` (tes memastikan tidak ada yang te
 ```
 src/
   app/                 Rute Expo Router
-    (tabs)/index.tsx   Grid alat + pencarian
-    (tabs)/files.tsx   Riwayat hasil
+    (tabs)/index.tsx   Beranda File: status privasi, alat cepat, penyimpanan, dokumen terbaru
+    (tabs)/tools.tsx   Daftar semua alat per kategori
+    (tabs)/settings.tsx Tema, bahasa, penyimpanan, tentang
     tool/[id].tsx      Membuka layar alat berdasarkan id
+    viewer.tsx         Penampil PDF (halaman, navigasi, zoom, alat cepat)
     incoming.tsx       File yang dibagikan/dibuka dari aplikasi lain
     +native-intent.ts  Mengarahkan link dari OS ke incoming
   lib/
