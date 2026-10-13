@@ -4,6 +4,7 @@
  * in plain Node as well as on device.
  */
 import {
+  BlendMode,
   LineCapStyle,
   PDFDocument,
   PDFFont,
@@ -562,11 +563,19 @@ export function strokesToPath(strokes: Point[][], padding = 4): DrawnPath | null
   const minY = Math.min(...pts.map((p) => p.y)) - padding;
   const maxX = Math.max(...pts.map((p) => p.x)) + padding;
   const maxY = Math.max(...pts.map((p) => p.y)) + padding;
+  const shifted = strokes.map((st) => st.map((q) => ({ x: q.x - minX, y: q.y - minY })));
+  return { d: smoothPath(shifted), width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * SVG path through touch samples. Midpoint quadratic curves smooth the
+ * jitter of raw samples; a single sample becomes a dot.
+ */
+export function smoothPath(strokes: Point[][]): string {
   const f = (n: number) => Math.round(n * 10) / 10;
   const parts: string[] = [];
-  for (const stroke of strokes) {
-    if (stroke.length === 0) continue;
-    const p = stroke.map((q) => ({ x: q.x - minX, y: q.y - minY }));
+  for (const p of strokes) {
+    if (p.length === 0) continue;
     parts.push(`M${f(p[0].x)} ${f(p[0].y)}`);
     if (p.length === 1) {
       // A tap: draw a dot so it still shows up.
@@ -581,7 +590,7 @@ export function strokesToPath(strokes: Point[][], padding = 4): DrawnPath | null
     const last = p[p.length - 1];
     parts.push(`L${f(last.x)} ${f(last.y)}`);
   }
-  return { d: parts.join(' '), width: maxX - minX, height: maxY - minY };
+  return parts.join(' ');
 }
 
 export type PathStampOptions = {
@@ -620,6 +629,84 @@ export async function stampPath(bytes: Bytes, o: PathStampOptions): Promise<Byte
 function rgbTuple(hex: string): [number, number, number] {
   const c = hexToRgb(hex);
   return [c.r, c.g, c.b];
+}
+
+// ---------------------------------------------------------------------------
+// Annotations
+// ---------------------------------------------------------------------------
+
+/**
+ * Coordinates are fractions of the page as the reader sees it (0..1, origin
+ * top-left), so annotations made on a scaled preview land in the same spot
+ * at any size and on rotated pages.
+ */
+export type InkAnnotation = {
+  kind: 'ink';
+  page: number;
+  points: Point[];
+  color: string;
+  /** Stroke width as a fraction of the page width. */
+  width: number;
+  /** Highlighter: translucent and multiplied onto the page. */
+  marker?: boolean;
+};
+
+export type TextAnnotation = {
+  kind: 'text';
+  page: number;
+  /** Top-left corner of the text. */
+  x: number;
+  y: number;
+  text: string;
+  /** Font size as a fraction of the page width. */
+  size: number;
+  color: string;
+};
+
+export type Annotation = InkAnnotation | TextAnnotation;
+
+export const MARKER_OPACITY = 0.4;
+/** Line height and baseline offset, relative to the font size. */
+export const TEXT_LINE_HEIGHT = 1.25;
+export const TEXT_ASCENT = 0.8;
+
+/** Stamps ink strokes and text boxes permanently onto the pages. */
+export async function annotate(bytes: Bytes, items: Annotation[]): Promise<Bytes> {
+  if (items.length === 0) throw new PdfToolError(t('Belum ada anotasi.'));
+  const doc = await loadPdf(bytes);
+  const font = items.some((a) => a.kind === 'text') ? await doc.embedFont(StandardFonts.Helvetica) : null;
+  for (const a of items) {
+    if (a.page < 0 || a.page >= doc.getPageCount()) continue;
+    const page = doc.getPage(a.page);
+    const f = frameOf(page);
+    const color = rgb(...rgbTuple(a.color));
+    if (a.kind === 'ink') {
+      const d = smoothPath([a.points.map((p) => ({ x: p.x * f.width, y: p.y * f.height }))]);
+      // drawSvgPath's origin is the path's top-left, y pointing down.
+      const origin = f.toUser(0, f.height);
+      page.drawSvgPath(d, {
+        x: origin.x,
+        y: origin.y,
+        rotate: degrees(f.rotation),
+        borderColor: color,
+        borderWidth: a.width * f.width,
+        borderOpacity: a.marker ? MARKER_OPACITY : 1,
+        borderLineCap: LineCapStyle.Round,
+        blendMode: a.marker ? BlendMode.Multiply : undefined,
+      });
+    } else {
+      const text = a.text.trim();
+      if (!text || !font) continue;
+      assertEncodable(font, text.replace(/\n/g, ' '));
+      const size = a.size * f.width;
+      text.split('\n').forEach((line, i) => {
+        const baseline = f.height * (1 - a.y) - size * (TEXT_ASCENT + i * TEXT_LINE_HEIGHT);
+        const { x, y } = f.toUser(a.x * f.width, baseline);
+        page.drawText(line, { x, y, size, font, color, rotate: degrees(f.rotation) });
+      });
+    }
+  }
+  return save(doc);
 }
 
 // ---------------------------------------------------------------------------

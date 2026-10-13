@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -12,17 +13,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnnotationLayer, type AnnotItem, type AnnotTool } from '@/components/annotation-layer';
+import { AnnotationToolbar, INK, MARKER, TextPrompt, WEIGHTS } from '@/components/annotation-toolbar';
 import { PageZoom } from '@/components/page-zoom';
 import { Button, ErrorBanner, Pill, Screen, SymbolIcon, Txt, type Icon } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { usePageImages } from '@/hooks/use-page-images';
 import { messageOf, usePageThumbs } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
-import { formatBytes, readBytes, shareFile, type PickedFile } from '@/lib/files';
+import { baseName, formatBytes, readBytes, saveOutput, shareFile, type PickedFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
 import { setPendingFiles } from '@/lib/incoming';
 import { openTool } from '@/lib/navigation';
-import { getInfo, type PdfInfo } from '@/lib/pdf/ops';
+import { annotate, getInfo, type Annotation, type PdfInfo } from '@/lib/pdf/ops';
 import type { ToolId } from '@/lib/tools';
 
 const GAP = Spacing.three;
@@ -103,19 +106,42 @@ function Loading({ children }: { children: React.ReactNode }) {
 
 // Labels are functions so they translate at render time, after the locale is set.
 const QUICK: { id: ToolId; label: () => string; icon: Icon }[] = [
-  { id: 'organize', label: () => t('Atur'), icon: { ios: 'square.grid.2x2', android: 'grid_view' } },
   { id: 'sign', label: () => t('Tanda tangan'), icon: { ios: 'signature', android: 'draw' } },
   { id: 'compress', label: () => t('Kompres'), icon: { ios: 'arrow.down.right.and.arrow.up.left', android: 'compress' } },
 ];
 
+const NO_ITEMS: AnnotItem[] = [];
+
 function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { width, scale } = useWindowDimensions();
   const listRef = useRef<FlatList<number>>(null);
   const [visible, setVisible] = useState<number[]>([0]);
   const [stripOpen, setStripOpen] = useState(false);
   const [zoomed, setZoomed] = useState<number | null>(null);
+
+  // Annotation state. Items are only kept until saved into a new PDF.
+  const [annotating, setAnnotating] = useState(false);
+  const [tool, setTool] = useState<AnnotTool>('pen');
+  const [penColor, setPenColor] = useState(INK[1]);
+  const [markerColor, setMarkerColor] = useState(MARKER[0]);
+  const [weights, setWeights] = useState<Record<'pen' | 'marker' | 'text', 0 | 1 | 2>>({ pen: 1, marker: 1, text: 1 });
+  const [items, setItems] = useState<AnnotItem[]>([]);
+  const [past, setPast] = useState<AnnotItem[][]>([]);
+  const [future, setFuture] = useState<AnnotItem[][]>([]);
+  const [textAt, setTextAt] = useState<{ page: number; x: number; y: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const nextId = useRef(1);
+  const allowLeave = useRef(false);
+  // The header's Save button is rendered via navigation options, which can
+  // lag a render behind; reading the latest items through a ref means a
+  // quick "draw, then Save" never saves a stale list.
+  const latestItems = useRef<AnnotItem[]>([]);
+  useEffect(() => {
+    latestItems.current = items;
+  }, [items]);
 
   const pageW = Math.min(width, MaxContentWidth) - PAD * 2;
   const pixelW = Math.min(1600, Math.round(pageW * scale));
@@ -131,6 +157,11 @@ function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
     }
     return out;
   }, [heights]);
+  const byPage = useMemo(() => {
+    const map = new Map<number, AnnotItem[]>();
+    for (const a of items) map.set(a.page, [...(map.get(a.page) ?? []), a]);
+    return map;
+  }, [items]);
 
   // Render what is on screen plus a page either side.
   useEffect(() => {
@@ -139,6 +170,19 @@ function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
     const around = [...visible, hi + 1, lo - 1, hi + 2].filter((i) => i >= 0 && i < info.pageCount);
     request(around);
   }, [visible, info.pageCount, request]);
+
+  // Don't lose unsaved annotations to an accidental back gesture.
+  const dirty = items.length > 0;
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', (e) => {
+      if (!dirty || allowLeave.current) return;
+      e.preventDefault();
+      Alert.alert(t('Buang anotasi?'), t('Anotasi yang belum disimpan akan hilang.'), [
+        { text: t('Batal'), style: 'cancel' },
+        { text: t('Buang'), style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      ]);
+    });
+  }, [navigation, dirty]);
 
   // FlatList requires a stable callback; it only forwards to a state setter.
   const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken<number>[] }) => {
@@ -153,33 +197,129 @@ function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
     router.push('/incoming');
   };
 
+  const color = tool === 'marker' ? markerColor : penColor;
+  const weightKey = tool === 'marker' ? 'marker' : tool === 'text' ? 'text' : 'pen';
+  const commit = (next: AnnotItem[]) => {
+    setPast((p) => [...p, items]);
+    setFuture([]);
+    setItems(next);
+  };
+  const add = (a: Annotation) => commit([...items, { ...a, id: nextId.current++ }]);
+  const erase = (id: number) => commit(items.filter((a) => a.id !== id));
+  const undo = () => {
+    const prev = past[past.length - 1];
+    if (!prev) return;
+    setPast(past.slice(0, -1));
+    setFuture([items, ...future]);
+    setItems(prev);
+  };
+  const redo = () => {
+    const [next, ...rest] = future;
+    if (!next) return;
+    setPast([...past, items]);
+    setFuture(rest);
+    setItems(next);
+  };
+  const reset = () => {
+    setItems([]);
+    setPast([]);
+    setFuture([]);
+    setAnnotating(false);
+  };
+  const cancel = () => {
+    if (!dirty) return reset();
+    Alert.alert(t('Buang anotasi?'), t('Anotasi yang belum disimpan akan hilang.'), [
+      { text: t('Batal'), style: 'cancel' },
+      { text: t('Buang'), style: 'destructive', onPress: reset },
+    ]);
+  };
+  async function save() {
+    setSaving(true);
+    // Let the overlay paint before pdf-lib occupies the JS thread.
+    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const out = await annotate(await readBytes(file.uri), latestItems.current);
+      const saved = saveOutput(`${baseName(file.name)}-${t('anotasi')}.pdf`, out);
+      allowLeave.current = true;
+      router.replace({
+        pathname: '/viewer',
+        params: { file: JSON.stringify({ uri: saved.uri, name: saved.name, size: saved.size }) },
+      });
+      Alert.alert(t('Tersimpan'), t('{name} berhasil disimpan.', { name: saved.name }));
+    } catch (e) {
+      Alert.alert(t('Gagal menyimpan'), messageOf(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <Stack.Screen
-        options={{
-          headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('Bagikan')}
-              hitSlop={10}
-              onPress={() => shareFile({ uri: file.uri, mimeType: 'application/pdf' })}>
-              <SymbolIcon icon={{ ios: 'square.and.arrow.up', android: 'share' }} size={20} color={theme.text} />
-            </Pressable>
-          ),
-        }}
+        options={
+          annotating
+            ? {
+                headerLeft: () => (
+                  <Pressable accessibilityRole="button" hitSlop={10} onPress={cancel} style={{ marginRight: Spacing.three }}>
+                    <Txt variant="bodyLg" color="textSecondary">
+                      {t('Batal')}
+                    </Txt>
+                  </Pressable>
+                ),
+                headerRight: () => (
+                  <Pressable accessibilityRole="button" hitSlop={10} disabled={!dirty || saving} onPress={save}>
+                    <Txt variant="labelLg" style={{ color: theme.accentOnSurface, opacity: dirty && !saving ? 1 : 0.4 }}>
+                      {t('Simpan')}
+                    </Txt>
+                  </Pressable>
+                ),
+              }
+            : {
+                headerLeft: undefined,
+                headerRight: () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('Bagikan')}
+                    hitSlop={10}
+                    onPress={() => shareFile({ uri: file.uri, mimeType: 'application/pdf' })}>
+                    <SymbolIcon icon={{ ios: 'square.and.arrow.up', android: 'share' }} size={20} color={theme.text} />
+                  </Pressable>
+                ),
+              }
+        }
       />
       <FlatList
         ref={listRef}
         data={pages}
         keyExtractor={(i) => String(i)}
-        contentContainerStyle={{ padding: PAD, gap: GAP, paddingBottom: insets.bottom + (stripOpen ? 230 : 120) }}
+        // Drawing tools need the finger; switch to Pan to scroll.
+        scrollEnabled={!annotating || tool === 'pan'}
+        contentContainerStyle={{
+          padding: PAD,
+          gap: GAP,
+          paddingBottom: insets.bottom + (annotating ? 190 : stripOpen ? 230 : 120),
+        }}
         getItemLayout={(_, i) => ({ index: i, length: heights[i], offset: offsets[i] })}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={{ itemVisiblePercentThreshold: 15 }}
         initialNumToRender={2}
         windowSize={5}
         renderItem={({ item }) => (
-          <PageView index={item} width={pageW} height={heights[item]} image={image(item)} onOpen={setZoomed} />
+          <PageView
+            index={item}
+            width={pageW}
+            height={heights[item]}
+            image={image(item)}
+            onOpen={setZoomed}
+            annotating={annotating}
+            items={byPage.get(item) ?? NO_ITEMS}
+            tool={tool}
+            color={color}
+            weight={WEIGHTS[weightKey][weights[weightKey]]}
+            onAdd={add}
+            onErase={erase}
+            onText={(page, x, y) => setTextAt({ page, x, y })}
+          />
         )}
       />
 
@@ -188,22 +328,63 @@ function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
       </View>
 
       <View pointerEvents="box-none" style={[styles.dock, { bottom: insets.bottom + 10 }]}>
-        {stripOpen && (
-          <Strip uri={file.uri} info={info} current={current} onPick={goTo} />
-        )}
-        <View style={[styles.bar, { backgroundColor: theme.chrome, borderColor: theme.border }]}>
-          <BarItem
-            label={t('Halaman')}
-            icon={{ ios: 'rectangle.split.3x1', android: 'view_carousel' }}
-            active={stripOpen}
-            onPress={() => setStripOpen((o) => !o)}
+        {annotating ? (
+          <AnnotationToolbar
+            tool={tool}
+            onTool={setTool}
+            color={color}
+            onColor={tool === 'marker' ? setMarkerColor : setPenColor}
+            weight={weights[weightKey]}
+            onWeight={(w) => setWeights((all) => ({ ...all, [weightKey]: w }))}
+            canUndo={past.length > 0}
+            canRedo={future.length > 0}
+            onUndo={undo}
+            onRedo={redo}
           />
-          {QUICK.map((q) => (
-            <BarItem key={q.id} label={q.label()} icon={q.icon} onPress={() => openTool(q.id, [file])} />
-          ))}
-          <BarItem label={t('Lainnya')} icon={{ ios: 'ellipsis.circle', android: 'more_horiz' }} onPress={more} />
-        </View>
+        ) : (
+          <>
+            {stripOpen && <Strip uri={file.uri} info={info} current={current} onPick={goTo} />}
+            <View style={[styles.bar, { backgroundColor: theme.chrome, borderColor: theme.border }]}>
+              <BarItem
+                label={t('Halaman')}
+                icon={{ ios: 'rectangle.split.3x1', android: 'view_carousel' }}
+                active={stripOpen}
+                onPress={() => setStripOpen((o) => !o)}
+              />
+              <BarItem
+                label={t('Anotasi')}
+                icon={{ ios: 'pencil.tip.crop.circle', android: 'edit_note' }}
+                onPress={() => {
+                  setStripOpen(false);
+                  setAnnotating(true);
+                }}
+              />
+              {QUICK.map((q) => (
+                <BarItem key={q.id} label={q.label()} icon={q.icon} onPress={() => openTool(q.id, [file])} />
+              ))}
+              <BarItem label={t('Lainnya')} icon={{ ios: 'ellipsis.circle', android: 'more_horiz' }} onPress={more} />
+            </View>
+          </>
+        )}
       </View>
+
+      <TextPrompt
+        visible={textAt !== null}
+        onCancel={() => setTextAt(null)}
+        onSubmit={(text) => {
+          if (textAt) add({ kind: 'text', ...textAt, text, size: WEIGHTS.text[weights.text], color: penColor });
+          setTextAt(null);
+        }}
+      />
+
+      {saving && (
+        <View style={styles.saving}>
+          <ActivityIndicator size="large" color={theme.accentText} />
+          <Txt variant="labelLg" style={{ color: '#fff' }}>
+            {t('Menyimpan anotasi…')}
+          </Txt>
+        </View>
+      )}
 
       <PageZoom
         uri={file.uri}
@@ -224,24 +405,55 @@ const PageView = memo(function PageView({
   height,
   image,
   onOpen,
+  annotating,
+  items,
+  tool,
+  color,
+  weight,
+  onAdd,
+  onErase,
+  onText,
 }: {
   index: number;
   width: number;
   height: number;
   image?: string;
   onOpen: (i: number) => void;
+  annotating: boolean;
+  items: AnnotItem[];
+  tool: AnnotTool;
+  color: string;
+  weight: number;
+  onAdd: (a: Annotation) => void;
+  onErase: (id: number) => void;
+  onText: (page: number, x: number, y: number) => void;
 }) {
   return (
     <Pressable
       accessibilityRole="imagebutton"
       accessibilityLabel={t('Halaman {n}', { n: index + 1 })}
-      accessibilityHint={t('Ketuk untuk memperbesar')}
+      accessibilityHint={annotating ? undefined : t('Ketuk untuk memperbesar')}
+      disabled={annotating}
       onPress={() => onOpen(index)}
       style={[styles.paper, { width, height }]}>
       {image ? (
         <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="contain" transition={120} />
       ) : (
         <ActivityIndicator color="#94A3B8" />
+      )}
+      {(annotating || items.length > 0) && (
+        <AnnotationLayer
+          page={index}
+          width={width}
+          height={height}
+          items={items}
+          tool={annotating ? tool : 'pan'}
+          color={color}
+          weight={weight}
+          onAdd={onAdd}
+          onErase={onErase}
+          onText={onText}
+        />
       )}
     </Pressable>
   );
@@ -345,6 +557,17 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   counter: { position: 'absolute', alignSelf: 'center' },
+  saving: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.three,
+  },
   dock: { position: 'absolute', left: 16, right: 16, alignItems: 'center', gap: Spacing.two },
   bar: {
     flexDirection: 'row',

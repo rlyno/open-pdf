@@ -259,3 +259,39 @@ describe('drawn signatures', () => {
     assert.equal((await PDFDocument.load(out)).getPageCount(), 2);
   });
 });
+
+describe('annotate', () => {
+  const wave = Array.from({ length: 20 }, (_, i) => ({ x: 0.1 + i * 0.04, y: 0.5 + 0.05 * Math.sin(i / 2) }));
+  const items: ops.Annotation[] = [
+    { kind: 'ink', page: 0, points: wave, color: '#2563EB', width: 0.01 },
+    { kind: 'ink', page: 0, points: [{ x: 0.1, y: 0.3 }, { x: 0.8, y: 0.3 }], color: '#FDE047', width: 0.04, marker: true },
+    { kind: 'text', page: 0, x: 0.1, y: 0.1, text: 'Catatan\nbaris kedua', size: 0.05, color: '#DC2626' },
+    { kind: 'text', page: 1, x: 0.1, y: 0.1, text: 'Halaman 2', size: 0.05, color: '#111111' },
+  ];
+
+  it('stamps ink, highlighter and text, also on rotated pages', async () => {
+    const out = await ops.annotate(await makePdf(2, { rotateFirst: 90 }), items);
+    dump('annotated.pdf', out);
+    const doc = await PDFDocument.load(out);
+    assert.equal(doc.getPageCount(), 2);
+    assert.ok(out.length > (await makePdf(2)).length);
+  });
+
+  it('rejects an empty list and unsupported characters', async () => {
+    const src = await makePdf(1);
+    await assert.rejects(ops.annotate(src, []), ops.PdfToolError);
+    await assert.rejects(
+      ops.annotate(src, [{ kind: 'text', page: 0, x: 0, y: 0, text: '注释', size: 0.05, color: '#000000' }]),
+      ops.PdfToolError
+    );
+  });
+
+  it('ignores annotations for pages that do not exist', async () => {
+    const out = await ops.annotate(await makePdf(1), [{ ...items[0], page: 5 }]);
+    assert.equal((await PDFDocument.load(out)).getPageCount(), 1);
+  });
+
+  it('smooths a path the same way for preview and PDF', () => {
+    assert.equal(ops.smoothPath([[{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 30, y: 10 }]]), 'M0 0 Q10 20 20 15 L30 10');
+  });
+});

@@ -22,6 +22,10 @@ Ketuk PDF di tab **File** untuk membukanya di **penampil**: halaman di-render ta
 ada penghitung halaman dan strip thumbnail untuk lompat halaman, ketuk halaman untuk memperbesar
 (cubit, geser, ketuk dua kali), dan bilah bawah untuk langsung membuka alat dengan dokumen itu.
 
+Tombol **Anotasi** di penampil membuka mode coret: pena, stabilo, teks, penghapus, plus urungkan/ulangi,
+palet warna, dan ketebalan. **Simpan** menempelkan anotasi secara permanen (vektor) ke file baru
+`…-anotasi.pdf`; file aslinya tidak diubah. Stabilo adalah coretan bebas, bukan seleksi teks.
+
 PDF dan gambar juga bisa dikirim dari aplikasi lain lewat menu **Bagikan**, atau dibuka dengan
 **"Buka dengan Open PDF"** (Android) / **"Buka di"** (iOS); aplikasi lalu menawarkan alat yang cocok.
 
