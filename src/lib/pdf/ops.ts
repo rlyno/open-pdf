@@ -21,7 +21,8 @@ export type Bytes = Uint8Array;
 
 export class PdfToolError extends Error {}
 
-const PRODUCER = 'Open PDF';
+/** Stamped on every PDF the app writes; identifies output (and copies of this code) as RLYNO's. */
+export const PRODUCER = 'Open PDF by RLYNO (github.com/epamemo/open-pdf)';
 
 /** Loads a PDF, turning pdf-lib's errors into messages a user can act on. */
 export async function loadPdf(bytes: Bytes, password?: string): Promise<PDFDocument> {

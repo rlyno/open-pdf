@@ -92,3 +92,13 @@ npx eas-cli@latest build --profile development --platform all
 - Kompres "Maksimal" mengubah halaman menjadi gambar, sehingga teks tidak bisa dipilih lagi.
 - Belum ada: OCR dan konversi Office ↔ PDF.
 - Menerima file dari aplikasi lain sudah dites di Android; di iOS (share extension) belum dites.
+
+## Lisensi
+
+Copyright (C) 2026 Epafraditus Memoriano (RLYNO).
+
+Open PDF adalah perangkat lunak bebas di bawah [GNU General Public License v3.0](LICENSE).
+Kamu boleh memakai, mengubah, dan mendistribusikan ulang (termasuk menjualnya), asalkan versi yang
+didistribusikan juga dirilis dengan GPL-3.0 beserta kode sumbernya, dan mencantumkan karya asli ini.
+
+Setiap PDF yang dihasilkan aplikasi ini memuat penanda `Producer: Open PDF by RLYNO` pada metadata.

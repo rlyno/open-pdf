@@ -161,6 +161,7 @@ describe('edit', () => {
     assert.equal(info.keywords, 'a b');
     assert.equal(info.pageCount, 1);
     assert.equal(info.encrypted, false);
+    assert.equal(info.producer, ops.PRODUCER);
   });
   it('reports visual page sizes', async () => {
     const info = await ops.getInfo(await makePdf(2, { rotateFirst: 90 }));

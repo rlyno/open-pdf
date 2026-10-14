@@ -94,6 +94,9 @@ export default function SettingsScreen() {
             <Txt variant="bodySm" color="textSecondary">
               {t('Versi {v}', { v: Constants.expoConfig?.version ?? '—' })}
             </Txt>
+            <Txt variant="bodySm" color="textSecondary">
+              © 2026 RLYNO · GPL-3.0
+            </Txt>
           </View>
         </View>
         <Txt variant="bodyMd" color="textSecondary">

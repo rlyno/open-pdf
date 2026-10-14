@@ -2,6 +2,8 @@
   "name": "open-pdf",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "license": "GPL-3.0-only",
+  "author": "Epafraditus Memoriano (RLYNO)",
   "dependencies": {
     "@cantoo/pdf-lib": "^2.11.1",
     "@expo-google-fonts/inter": "^0.4.2",
