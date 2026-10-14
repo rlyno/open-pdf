@@ -112,6 +112,21 @@ export async function importIncoming(uri: string, name: string | null, ext: stri
   return { uri: dest.uri, name: clean, size: bytes.length };
 }
 
+const UNLOCKED_DIR = new Directory(Paths.cache, 'unlocked');
+
+/**
+ * Keeps a decrypted copy for viewing in the cache, out of the user's file
+ * list. Only the latest one is kept, so decrypted copies don't pile up.
+ */
+export function writeUnlockedCopy(name: string, bytes: Uint8Array): PickedFile {
+  if (UNLOCKED_DIR.exists) UNLOCKED_DIR.delete();
+  UNLOCKED_DIR.create({ intermediates: true });
+  const dest = new File(UNLOCKED_DIR, `${Date.now()}-${sanitize(name)}`);
+  dest.create();
+  dest.write(bytes);
+  return { uri: dest.uri, name, size: bytes.length };
+}
+
 function ensureOutputDir() {
   if (!OUTPUT_DIR.exists) OUTPUT_DIR.create({ intermediates: true });
 }

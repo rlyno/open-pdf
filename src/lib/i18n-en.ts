@@ -344,6 +344,12 @@ export const EN: Record<string, string> = {
   'Hapus tanda tangan tersimpan?': 'Delete saved signature?',
   'Tekan lama tanda tangan tersimpan untuk menghapusnya.': 'Long-press a saved signature to delete it.',
   'Tekan lama untuk menghapus': 'Long-press to delete',
+  Terkunci: 'Locked',
+  'Masukkan password untuk membuka PDF ini. File aslinya tetap terkunci.':
+    'Enter the password to open this PDF. The original file stays locked.',
+  Buka: 'Open',
+  'Hasil anotasi atau alat dari penampil ini disimpan tanpa password.':
+    'Annotations or tool results from this viewer are saved without a password.',
   diisi: 'filled',
   'Isi formulir': 'Fill form',
 

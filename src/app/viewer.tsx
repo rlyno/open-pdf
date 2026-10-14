@@ -16,16 +16,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnnotationLayer, type AnnotItem, type AnnotTool } from '@/components/annotation-layer';
 import { AnnotationToolbar, INK, MARKER, TextPrompt, WEIGHTS } from '@/components/annotation-toolbar';
 import { PageZoom } from '@/components/page-zoom';
-import { Button, ErrorBanner, Pill, Screen, SymbolIcon, Txt, type Icon } from '@/components/ui';
+import { Body, Button, Card, ErrorBanner, Field, Pill, Screen, SymbolIcon, Txt, type Icon } from '@/components/ui';
 import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { usePageImages } from '@/hooks/use-page-images';
 import { messageOf, usePageThumbs } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
-import { baseName, formatBytes, readBytes, saveOutput, shareFile, type PickedFile } from '@/lib/files';
+import { baseName, formatBytes, readBytes, saveOutput, shareFile, writeUnlockedCopy, type PickedFile } from '@/lib/files';
 import { t } from '@/lib/i18n';
 import { setPendingFiles } from '@/lib/incoming';
 import { openTool } from '@/lib/navigation';
-import { annotate, getInfo, type Annotation, type PdfInfo } from '@/lib/pdf/ops';
+import { annotate, getInfo, unlock, type Annotation, type PdfInfo } from '@/lib/pdf/ops';
 import type { ToolId } from '@/lib/tools';
 
 const GAP = Spacing.three;
@@ -34,13 +34,16 @@ const PAD = Spacing.three;
 /** Read-only PDF viewer with page navigation and quick access to tools. */
 export default function ViewerScreen() {
   const params = useLocalSearchParams<{ file: string }>();
-  const file = useMemo(() => JSON.parse(params.file) as PickedFile, [params.file]);
+  const original = useMemo(() => JSON.parse(params.file) as PickedFile, [params.file]);
+  // A password-protected PDF is shown from a decrypted copy once unlocked.
+  const [unlocked, setUnlocked] = useState<{ file: PickedFile; info: PdfInfo } | null>(null);
+  const file = unlocked?.file ?? original;
   const [info, setInfo] = useState<PdfInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    readBytes(file.uri)
+    readBytes(original.uri)
       .then(getInfo)
       .then(
         (i) => active && setInfo(i),
@@ -49,7 +52,7 @@ export default function ViewerScreen() {
     return () => {
       active = false;
     };
-  }, [file.uri]);
+  }, [original.uri]);
 
   const header = <Stack.Screen options={{ headerTitle: () => <Title file={file} info={info} /> }} />;
   if (error) {
@@ -63,19 +66,66 @@ export default function ViewerScreen() {
   if (!info) {
     return <Loading>{header}</Loading>;
   }
-  if (info.encrypted) {
+  if (info.encrypted && !unlocked) {
     return (
       <Screen>
         {header}
-        <ErrorBanner message={t('PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".')} />
-        <Button title={t('Hapus Password')} onPress={() => openTool('unlock', [file])} />
+        <PasswordPrompt file={original} onUnlocked={setUnlocked} />
       </Screen>
     );
   }
   return (
     <>
       {header}
-      <Pages file={file} info={info} />
+      <Pages file={file} info={unlocked?.info ?? info} />
+    </>
+  );
+}
+
+function PasswordPrompt({ file, onUnlocked }: { file: PickedFile; onUnlocked: (u: { file: PickedFile; info: PdfInfo }) => void }) {
+  const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!pw || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const bytes = await unlock(await readBytes(file.uri), pw);
+      const copy = writeUnlockedCopy(file.name, bytes);
+      onUnlocked({ file: copy, info: await getInfo(bytes) });
+    } catch (e) {
+      setError(messageOf(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <View style={styles.lockRow}>
+          <Pill label={t('Terkunci')} tone="danger" />
+          <Txt variant="bodyMd" color="textSecondary" style={{ flex: 1 }}>
+            {t('Masukkan password untuk membuka PDF ini. File aslinya tetap terkunci.')}
+          </Txt>
+        </View>
+        <Field
+          label={t('Password')}
+          value={pw}
+          onChangeText={setPw}
+          secureTextEntry
+          autoCapitalize="none"
+          autoFocus
+          textContentType="password"
+          returnKeyType="go"
+          onSubmitEditing={submit}
+        />
+        <Button title={t('Buka')} onPress={submit} loading={busy} disabled={!pw} />
+        <Body secondary>{t('Hasil anotasi atau alat dari penampil ini disimpan tanpa password.')}</Body>
+      </Card>
+      {error && <ErrorBanner message={error} />}
+      <Button title={t('Hapus Password')} variant="secondary" onPress={() => openTool('unlock', [file])} />
     </>
   );
 }
@@ -549,6 +599,7 @@ function BarItem({ label, icon, onPress, active }: { label: string; icon: Icon; 
 }
 
 const styles = StyleSheet.create({
+  lockRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   paper: {
     alignSelf: 'center',
