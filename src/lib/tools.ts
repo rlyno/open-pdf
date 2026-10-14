@@ -16,6 +16,7 @@ export type ToolId =
   | 'page-numbers'
   | 'sign'
   | 'metadata'
+  | 'fill-form'
   | 'flatten'
   | 'protect'
   | 'unlock';
@@ -200,6 +201,17 @@ export const TOOLS: ToolDef[] = [
     badgeTone: 'neutral',
     feature: 'Judul, penulis, kata kunci',
     keywords: 'metadata properties info title author',
+  },
+  {
+    id: 'fill-form',
+    input: 'pdf',
+    title: 'Isi Formulir',
+    description: 'Isi kolom formulir PDF langsung di HP',
+    category: 'edit',
+    icon: { ios: 'list.bullet.rectangle', android: 'assignment' },
+    badge: 'Formulir',
+    feature: 'Teks, kotak centang, dan pilihan',
+    keywords: 'fill form field acroform isi',
   },
   {
     id: 'flatten',

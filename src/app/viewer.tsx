@@ -105,9 +105,16 @@ function Loading({ children }: { children: React.ReactNode }) {
 }
 
 // Labels are functions so they translate at render time, after the locale is set.
-const QUICK: { id: ToolId; label: () => string; icon: Icon }[] = [
-  { id: 'sign', label: () => t('Tanda tangan'), icon: { ios: 'signature', android: 'draw' } },
+type QuickTool = { id: ToolId; label: () => string; icon: Icon };
+const SIGN: QuickTool = { id: 'sign', label: () => t('Tanda tangan'), icon: { ios: 'signature', android: 'draw' } };
+const QUICK: QuickTool[] = [
+  SIGN,
   { id: 'compress', label: () => t('Kompres'), icon: { ios: 'arrow.down.right.and.arrow.up.left', android: 'compress' } },
+];
+/** A fillable PDF swaps Compress for the form filler. */
+const QUICK_FORM: QuickTool[] = [
+  { id: 'fill-form', label: () => t('Isi formulir'), icon: { ios: 'list.bullet.rectangle', android: 'assignment' } },
+  SIGN,
 ];
 
 const NO_ITEMS: AnnotItem[] = [];
@@ -359,7 +366,7 @@ function Pages({ file, info }: { file: PickedFile; info: PdfInfo }) {
                   setAnnotating(true);
                 }}
               />
-              {QUICK.map((q) => (
+              {(info.hasForm ? QUICK_FORM : QUICK).map((q) => (
                 <BarItem key={q.id} label={q.label()} icon={q.icon} onPress={() => openTool(q.id, [file])} />
               ))}
               <BarItem label={t('Lainnya')} icon={{ ios: 'ellipsis.circle', android: 'more_horiz' }} onPress={more} />

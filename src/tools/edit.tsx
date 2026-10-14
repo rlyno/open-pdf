@@ -5,9 +5,9 @@ import Svg, { Path } from 'react-native-svg';
 
 import { RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
 import { INK_COLORS, INK_WIDTH, SignaturePad } from '@/components/signature-pad';
-import { Body, Button, Card, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow, Txt } from '@/components/ui';
+import { Body, Button, Card, Chip, ErrorBanner, Field, Label, Screen, Segmented, Stepper, SwitchRow, Txt } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { outName, type PdfSource, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
+import { messageOf, outName, type PdfSource, type ToolProps, usePdfSource, useToolRun } from '@/hooks/use-tool';
 import { useTheme } from '@/hooks/use-theme';
 import { pickImages, readBytes, type PickedImage } from '@/lib/files';
 import { localeTag, t } from '@/lib/i18n';
@@ -380,6 +380,123 @@ function MetadataForm({ source: s }: { source: PdfSource }) {
   );
 }
 
+export function FillFormTool({ initial }: ToolProps) {
+  const src = usePdfSource(initial?.[0]);
+  const s = src.source;
+  return (
+    <Screen>
+      <SourceCard source={s} onPick={src.pick} loading={src.loading} error={src.error} />
+      {s &&
+        (s.info.encrypted ? (
+          <ErrorBanner message={t('PDF ini dilindungi password. Buka dulu dengan alat "Hapus Password".')} />
+        ) : !s.info.hasForm ? (
+          <ErrorBanner message={t('PDF ini tidak memiliki formulir.')} />
+        ) : (
+          // Keyed so the form starts fresh from each newly picked file.
+          <FormFiller key={s.uri} source={s} />
+        ))}
+    </Screen>
+  );
+}
+
+/** "Page1.Data_Diri.nama_lengkap" reads as "nama lengkap". */
+function fieldLabel(name: string) {
+  return (name.split('.').pop() ?? name).replace(/\[\d+\]$/, '').replace(/[_-]+/g, ' ').trim() || name;
+}
+
+function FormFiller({ source: s }: { source: PdfSource }) {
+  const run = useToolRun();
+  const [fields, setFields] = useState<ops.FormField[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Only edited fields are written back, so untouched ones keep their original look.
+  const [edits, setEdits] = useState<ops.FormValues>({});
+  const [flatten, setFlatten] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    readBytes(s.uri)
+      .then(ops.getFormFields)
+      .then(
+        (f) => active && setFields(f),
+        (e) => active && setLoadError(messageOf(e))
+      );
+    return () => {
+      active = false;
+    };
+  }, [s.uri]);
+
+  if (loadError) return <ErrorBanner message={loadError} />;
+  if (!fields) return <Body secondary>{t('Membaca formulir…')}</Body>;
+  if (fields.length === 0) return <ErrorBanner message={t('PDF ini tidak memiliki kolom yang bisa diisi.')} />;
+
+  const valueOf = (f: ops.FormField) => (f.name in edits ? edits[f.name] : f.value);
+  const set = (name: string, v: string | boolean) => setEdits((e) => ({ ...e, [name]: v }));
+  const pages = [...new Set(fields.map((f) => f.page))];
+  const changed = Object.keys(edits).length;
+
+  return (
+    <>
+      {pages.map((page) => (
+        <Card key={page}>
+          {pages.length > 1 && <Label>{t('Halaman {n}', { n: page + 1 })}</Label>}
+          {fields
+            .filter((f) => f.page === page)
+            .map((f) => {
+              const label = fieldLabel(f.name);
+              if (f.kind === 'checkbox') {
+                return <SwitchRow key={f.name} label={label} value={valueOf(f) as boolean} onChange={(v) => !f.readOnly && set(f.name, v)} />;
+              }
+              if (f.kind === 'choice') {
+                const current = valueOf(f) as string;
+                return (
+                  <View key={f.name} style={styles.choice}>
+                    <Label>{label}</Label>
+                    <View style={styles.chips}>
+                      {f.options.map((o) => (
+                        <Chip
+                          key={o}
+                          label={o}
+                          selected={o === current}
+                          // Tapping the selected option clears it.
+                          onPress={() => !f.readOnly && set(f.name, o === current ? '' : o)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                );
+              }
+              return (
+                <Field
+                  key={f.name}
+                  label={label}
+                  value={valueOf(f) as string}
+                  onChangeText={(v) => set(f.name, v)}
+                  editable={!f.readOnly}
+                  multiline={f.multiline}
+                  maxLength={f.maxLength}
+                />
+              );
+            })}
+        </Card>
+      ))}
+      <Card>
+        <SwitchRow label={t('Kunci isian setelah disimpan')} value={flatten} onChange={setFlatten} />
+        <Body secondary>
+          {flatten
+            ? t('Isian jadi bagian halaman dan tidak bisa diubah lagi.')
+            : t('Isian tetap bisa diubah di aplikasi PDF lain.')}
+        </Body>
+      </Card>
+      <RunSection
+        title={t('Simpan formulir')}
+        disabled={changed === 0 && !flatten}
+        run={run}
+        onPress={() => run.run(async () => [{ name: outName(s, 'diisi'), bytes: await ops.fillForm(await readBytes(s.uri), edits, { flatten }) }])}
+      />
+    </>
+  );
+}
+
 export function FlattenTool({ initial }: ToolProps) {
   const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
@@ -412,4 +529,6 @@ const styles = StyleSheet.create({
   page: { borderWidth: 1, backgroundColor: '#fff', overflow: 'hidden' },
   row: { flexDirection: 'row', gap: Spacing.two },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.three },
+  choice: { gap: Spacing.two },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 });

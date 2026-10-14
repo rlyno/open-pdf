@@ -175,6 +175,58 @@ describe('edit', () => {
     assert.equal((await ops.getInfo(out)).hasForm, false);
     await assert.rejects(ops.flattenForm(await makePdf(1)), ops.PdfToolError);
   });
+  it('lists and fills form fields', async () => {
+    const doc = await PDFDocument.create();
+    const [p1, p2] = [doc.addPage([300, 400]), doc.addPage([300, 400])];
+    const form = doc.getForm();
+    const add = <T extends { addToPage: (p: typeof p1, o: object) => void }>(f: T, page: typeof p1, y: number) => {
+      f.addToPage(page, { x: 20, y, width: 120, height: 20 });
+      return f;
+    };
+    add(form.createTextField('nama'), p1, 340);
+    add(form.createCheckBox('setuju'), p1, 200);
+    add(form.createTextField('alamat'), p1, 300).enableMultiline();
+    const kota = add(form.createDropdown('kota'), p2, 300);
+    kota.addOptions(['Jakarta', 'Bandung']);
+    const radio = form.createRadioGroup('jenis');
+    radio.addOptionToPage('L', p2, { x: 20, y: 200, width: 15, height: 15 });
+    radio.addOptionToPage('P', p2, { x: 60, y: 200, width: 15, height: 15 });
+    const locked = add(form.createTextField('nomor'), p2, 100);
+    locked.setText('A-1');
+    locked.enableReadOnly();
+    const src = await doc.save();
+
+    const fields = await ops.getFormFields(src);
+    assert.deepEqual(
+      fields.map((f) => [f.name, f.kind, f.page]),
+      [
+        ['nama', 'text', 0],
+        ['alamat', 'text', 0],
+        ['setuju', 'checkbox', 0],
+        ['kota', 'choice', 1],
+        ['jenis', 'choice', 1],
+        ['nomor', 'text', 1],
+      ]
+    );
+    assert.deepEqual(fields.find((f) => f.name === 'jenis')!.kind === 'choice' && fields.find((f) => f.name === 'jenis'), {
+      kind: 'choice', name: 'jenis', page: 1, value: '', options: ['L', 'P'], readOnly: false,
+    });
+
+    const out = await ops.fillForm(src, { nama: 'Budi', alamat: 'Jl. Merdeka 1\nBandung', setuju: true, kota: 'Bandung', jenis: 'P', nomor: 'X', lain: 'abaikan' });
+    dump('form-filled.pdf', out);
+    const values = Object.fromEntries((await ops.getFormFields(out)).map((f) => [f.name, f.value]));
+    assert.deepEqual(values, { nama: 'Budi', alamat: 'Jl. Merdeka 1\nBandung', setuju: true, kota: 'Bandung', jenis: 'P', nomor: 'A-1' });
+
+    const cleared = await ops.fillForm(out, { nama: '', setuju: false, kota: '' });
+    const after = Object.fromEntries((await ops.getFormFields(cleared)).map((f) => [f.name, f.value]));
+    assert.equal(after.nama, '');
+    assert.equal(after.setuju, false);
+    assert.equal(after.kota, '');
+
+    const flat = await ops.fillForm(src, { nama: 'Budi' }, { flatten: true });
+    assert.equal((await ops.getInfo(flat)).hasForm, false);
+    await assert.rejects(ops.fillForm(src, { nama: 'Ахмед' }), ops.PdfToolError);
+  });
   it('stamps an image', async () => {
     const out = await ops.stampImage(await makePdf(2, { rotateFirst: 90 }), {
       image: { bytes: PNG, kind: 'png' },

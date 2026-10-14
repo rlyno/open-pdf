@@ -6,9 +6,14 @@
 import {
   BlendMode,
   LineCapStyle,
+  PDFCheckBox,
   PDFDocument,
+  PDFDropdown,
   PDFFont,
+  PDFOptionList,
   PDFPage,
+  PDFRadioGroup,
+  PDFTextField,
   StandardFonts,
   degrees,
   rgb,
@@ -509,6 +514,71 @@ export async function addPageNumbers(bytes: Bytes, o: PageNumberOptions): Promis
     const cx = horiz === 'left' ? o.margin + w / 2 : horiz === 'right' ? f.width - o.margin - w / 2 : f.width / 2;
     drawCentered(page, f, label, font, o.fontSize, cx, cy, 0, { r: 0, g: 0, b: 0 }, 1);
   });
+  return save(doc);
+}
+
+export type FormField =
+  | { kind: 'text'; name: string; page: number; value: string; multiline: boolean; maxLength?: number; readOnly: boolean }
+  | { kind: 'checkbox'; name: string; page: number; value: boolean; readOnly: boolean }
+  | { kind: 'choice'; name: string; page: number; value: string; options: string[]; readOnly: boolean };
+
+export type FormValues = Record<string, string | boolean>;
+
+/**
+ * Lists the fillable fields in reading order (page, then top to bottom).
+ * Radio groups, dropdowns and option lists all become one-of-many "choice"
+ * fields; buttons and signature fields are left out since they hold no value.
+ */
+export async function getFormFields(bytes: Bytes): Promise<FormField[]> {
+  const doc = await loadPdf(bytes);
+  const pageOfRef = new Map<string, number>();
+  doc.getPages().forEach((p, i) => {
+    for (const ref of p.node.Annots()?.asArray() ?? []) pageOfRef.set(ref.toString(), i);
+  });
+  const placed: { field: FormField; top: number }[] = [];
+  for (const f of doc.getForm().getFields()) {
+    const widget = f.acroField.getWidgets()[0];
+    const ref = widget && doc.context.getObjectRef(widget.dict);
+    const page = (ref && pageOfRef.get(ref.toString())) ?? 0;
+    const top = widget ? -widget.getRectangle().y : 0;
+    const base = { name: f.getName(), page, readOnly: f.isReadOnly() };
+    let field: FormField | null = null;
+    if (f instanceof PDFTextField) {
+      field = { ...base, kind: 'text', value: f.getText() ?? '', multiline: f.isMultiline(), maxLength: f.getMaxLength() };
+    } else if (f instanceof PDFCheckBox) {
+      field = { ...base, kind: 'checkbox', value: f.isChecked() };
+    } else if (f instanceof PDFRadioGroup) {
+      field = { ...base, kind: 'choice', value: f.getSelected() ?? '', options: f.getOptions() };
+    } else if (f instanceof PDFDropdown || f instanceof PDFOptionList) {
+      field = { ...base, kind: 'choice', value: f.getSelected()[0] ?? '', options: f.getOptions() };
+    }
+    if (field) placed.push({ field, top });
+  }
+  return placed.sort((a, b) => a.field.page - b.field.page || a.top - b.top).map((p) => p.field);
+}
+
+/**
+ * Writes values into the named fields, optionally flattening them into the
+ * page. Unknown names are ignored so stale values can't break a save.
+ */
+export async function fillForm(bytes: Bytes, values: FormValues, opts: { flatten?: boolean } = {}): Promise<Bytes> {
+  const doc = await loadPdf(bytes);
+  const form = doc.getForm();
+  for (const [name, value] of Object.entries(values)) {
+    const f = form.getFieldMaybe(name);
+    if (!f || f.isReadOnly()) continue;
+    if (f instanceof PDFTextField) {
+      assertEncodable(form.getDefaultFont(), String(value));
+      f.setText(String(value) || undefined);
+    } else if (f instanceof PDFCheckBox) {
+      if (value) f.check();
+      else f.uncheck();
+    } else if (f instanceof PDFRadioGroup || f instanceof PDFDropdown || f instanceof PDFOptionList) {
+      if (value) f.select(String(value));
+      else f.clear();
+    }
+  }
+  if (opts.flatten) form.flatten();
   return save(doc);
 }
 

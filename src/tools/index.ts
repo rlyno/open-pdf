@@ -4,7 +4,7 @@ import type { ToolProps } from '@/hooks/use-tool';
 
 import type { ToolId } from '@/lib/tools';
 import { CompressTool, ImagesToPdfTool, PdfToImagesTool } from '@/tools/convert';
-import { FlattenTool, MetadataTool, PageNumbersTool, SignTool, WatermarkTool } from '@/tools/edit';
+import { FillFormTool, FlattenTool, MetadataTool, PageNumbersTool, SignTool, WatermarkTool } from '@/tools/edit';
 import { MergeTool, NUpTool, OrganizeTool, RemovePagesTool, RotateTool, SplitTool } from '@/tools/organize';
 import { ProtectTool, UnlockTool } from '@/tools/security';
 
@@ -22,6 +22,7 @@ export const TOOL_SCREENS: Record<ToolId, ComponentType<ToolProps>> = {
   'page-numbers': PageNumbersTool,
   sign: SignTool,
   metadata: MetadataTool,
+  'fill-form': FillFormTool,
   flatten: FlattenTool,
   protect: ProtectTool,
   unlock: UnlockTool,
