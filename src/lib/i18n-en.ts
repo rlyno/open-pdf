@@ -339,6 +339,11 @@ export const EN: Record<string, string> = {
   'Isian jadi bagian halaman dan tidak bisa diubah lagi.': 'Entries become part of the page and can no longer be changed.',
   'Isian tetap bisa diubah di aplikasi PDF lain.': 'Entries can still be changed in other PDF apps.',
   'Simpan formulir': 'Save form',
+  'Tanda tangan tersimpan': 'Saved signatures',
+  'Simpan untuk dipakai lagi': 'Save for next time',
+  'Hapus tanda tangan tersimpan?': 'Delete saved signature?',
+  'Tekan lama tanda tangan tersimpan untuk menghapusnya.': 'Long-press a saved signature to delete it.',
+  'Tekan lama untuk menghapus': 'Long-press to delete',
   diisi: 'filled',
   'Isi formulir': 'Fill form',
 

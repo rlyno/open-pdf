@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { RunButton, RunOutput, RunSection, SourceCard } from '@/components/pdf-parts';
@@ -13,6 +13,15 @@ import { pickImages, readBytes, type PickedImage } from '@/lib/files';
 import { localeTag, t } from '@/lib/i18n';
 import * as ops from '@/lib/pdf/ops';
 import { canRender, renderPage } from '@/lib/render';
+import {
+  imageUri,
+  loadImage,
+  removeSignature,
+  saveDrawn,
+  saveImage,
+  useSignatures,
+  type SavedSignature,
+} from '@/lib/signatures';
 
 const COLORS = ['#808080', '#E5483B', '#2F6FEB', '#1A9A6C', '#000000'];
 
@@ -171,6 +180,9 @@ export function SignTool({ initial }: ToolProps) {
   const src = usePdfSource(initial?.[0]);
   const run = useToolRun();
   const [stamp, setStamp] = useState<Stamp | null>(null);
+  // Id of the saved signature in use, or null when the stamp isn't saved yet.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const signatures = useSignatures();
   const [drawing, setDrawing] = useState(false);
   const [ink, setInk] = useState(INK_COLORS[1]);
   const [page, setPage] = useState(1);
@@ -200,6 +212,30 @@ export function SignTool({ initial }: ToolProps) {
   const aspect = !stamp ? 0 : stamp.kind === 'image' ? stamp.image.height / stamp.image.width : stamp.path.height / stamp.path.width;
   const stampH = stampW * aspect;
 
+  function choose(next: Stamp, id: string | null = null) {
+    setStamp(next);
+    setSavedId(id);
+  }
+
+  async function pickSaved(sig: SavedSignature) {
+    if (sig.kind === 'drawn') choose({ kind: 'drawn', path: sig.path, color: sig.color }, sig.id);
+    else choose({ kind: 'image', image: await loadImage(sig) }, sig.id);
+  }
+
+  function confirmRemove(sig: SavedSignature) {
+    Alert.alert(t('Hapus tanda tangan tersimpan?'), undefined, [
+      { text: t('Batal'), style: 'cancel' },
+      {
+        text: t('Hapus'),
+        style: 'destructive',
+        onPress: () => {
+          removeSignature(sig.id);
+          if (sig.id === savedId) setSavedId(null);
+        },
+      },
+    ]);
+  }
+
   return (
     <Screen
       scrollToTopKey={run.results.length}
@@ -225,6 +261,22 @@ export function SignTool({ initial }: ToolProps) {
       <RunOutput run={run} />
       {s && (
         <Card>
+          {signatures.length > 0 && (
+            <>
+              <Label>{t('Tanda tangan tersimpan')}</Label>
+              <View style={styles.savedGrid}>
+                {signatures.map((sig) => (
+                  <SavedTile
+                    key={sig.id}
+                    sig={sig}
+                    selected={sig.id === savedId}
+                    onPress={() => pickSaved(sig)}
+                    onLongPress={() => confirmRemove(sig)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <Button
@@ -241,7 +293,7 @@ export function SignTool({ initial }: ToolProps) {
                 icon={{ ios: 'photo', android: 'image' }}
                 onPress={async () => {
                   const [img] = await pickImages({ multiple: false, maxSide: 1600 });
-                  if (img) setStamp({ kind: 'image', image: img });
+                  if (img) choose({ kind: 'image', image: img });
                 }}
               />
             </View>
@@ -251,6 +303,16 @@ export function SignTool({ initial }: ToolProps) {
               ? t('Ketuk halaman di bawah untuk memindahkan posisi.')
               : t('Gambar tanda tangan dengan jari, atau pakai foto/PNG transparan.')}
           </Body>
+          {stamp && !savedId && (
+            <Button
+              title={t('Simpan untuk dipakai lagi')}
+              variant="ghost"
+              compact
+              icon={{ ios: 'bookmark', android: 'bookmark' }}
+              onPress={() => setSavedId(stamp.kind === 'drawn' ? saveDrawn(stamp.path, stamp.color) : saveImage(stamp.image))}
+            />
+          )}
+          {signatures.length > 0 && <Body secondary>{t('Tekan lama tanda tangan tersimpan untuk menghapusnya.')}</Body>}
           <Stepper label={t('Halaman ke')} value={page} onChange={setPage} min={1} max={s.info.pageCount} />
           <Stepper label={t('Lebar')} value={widthPct} onChange={setWidthPct} min={5} max={90} step={5} format={(v) => `${v}%`} />
         </Card>
@@ -261,7 +323,7 @@ export function SignTool({ initial }: ToolProps) {
         onColor={setInk}
         onCancel={() => setDrawing(false)}
         onDone={(path) => {
-          setStamp({ kind: 'drawn', path, color: ink });
+          choose({ kind: 'drawn', path, color: ink });
           setDrawing(false);
         }}
       />
@@ -308,6 +370,39 @@ export function SignTool({ initial }: ToolProps) {
         </View>
       )}
     </Screen>
+  );
+}
+
+/** A saved signature as a small tile: tap to use, long-press to delete. */
+function SavedTile({
+  sig,
+  selected,
+  onPress,
+  onLongPress,
+}: {
+  sig: SavedSignature;
+  selected: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('Tanda tangan tersimpan')}
+      accessibilityHint={t('Tekan lama untuk menghapus')}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[styles.savedTile, { borderColor: selected ? theme.accent : theme.border, borderWidth: selected ? 2 : 1 }]}>
+      {sig.kind === 'image' ? (
+        <Image source={{ uri: imageUri(sig) }} contentFit="contain" style={StyleSheet.absoluteFill} />
+      ) : (
+        <Svg width="100%" height="100%" viewBox={`0 0 ${sig.path.width} ${sig.path.height}`}>
+          <Path d={sig.path.d} stroke={sig.color} strokeWidth={INK_WIDTH} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </Svg>
+      )}
+    </Pressable>
   );
 }
 
@@ -530,5 +625,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.two },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.three },
   choice: { gap: Spacing.two },
+  savedGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  // Signatures are drawn dark, so tiles stay white in dark mode too.
+  savedTile: { width: '31%', aspectRatio: 2, borderRadius: 10, padding: 6, backgroundColor: '#fff', overflow: 'hidden' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 });
