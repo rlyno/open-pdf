@@ -10,7 +10,7 @@ import { deleteOutput, formatBytes, listOutputs } from '@/lib/files';
 import { t } from '@/lib/i18n';
 import { setPrefs, setReturnTo, usePrefs, type LanguagePref, type ThemePref } from '@/lib/prefs';
 
-const REPO_URL = 'https://github.com/epamemo/open-pdf';
+const REPO_URL = 'https://github.com/rlyno/open-pdf';
 
 export default function SettingsScreen() {
   const theme = useTheme();
