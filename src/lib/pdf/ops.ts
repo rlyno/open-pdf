@@ -569,6 +569,10 @@ export async function fillForm(bytes: Bytes, values: FormValues, opts: { flatten
     if (!f || f.isReadOnly()) continue;
     if (f instanceof PDFTextField) {
       assertEncodable(form.getDefaultFont(), String(value));
+      // pdf-lib's auto size picks the largest font at which the words still
+      // fit one per line, so a short address in a tall box comes out huge.
+      // Use a regular size instead, as desktop readers do.
+      if (f.isMultiline() && autoFontSize(f)) f.setFontSize(MULTILINE_FONT_SIZE);
       f.setText(String(value) || undefined);
     } else if (f instanceof PDFCheckBox) {
       if (value) f.check();
@@ -580,6 +584,14 @@ export async function fillForm(bytes: Bytes, values: FormValues, opts: { flatten
   }
   if (opts.flatten) form.flatten();
   return save(doc);
+}
+
+const MULTILINE_FONT_SIZE = 12;
+
+/** True when the field's default appearance leaves the font size to the reader ("0 Tf" or none). */
+function autoFontSize(f: PDFTextField) {
+  const size = /(\d*\.?\d+)\s+Tf/.exec(f.acroField.getDefaultAppearance() ?? '')?.[1];
+  return !size || Number(size) === 0;
 }
 
 export async function flattenForm(bytes: Bytes): Promise<Bytes> {

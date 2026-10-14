@@ -185,7 +185,10 @@ describe('edit', () => {
     };
     add(form.createTextField('nama'), p1, 340);
     add(form.createCheckBox('setuju'), p1, 200);
-    add(form.createTextField('alamat'), p1, 300).enableMultiline();
+    const alamat = add(form.createTextField('alamat'), p1, 300);
+    alamat.enableMultiline();
+    // Auto font size, as Acrobat-made forms usually have.
+    alamat.acroField.setDefaultAppearance('0 0 0 rg\n/Helvetica 0 Tf');
     const kota = add(form.createDropdown('kota'), p2, 300);
     kota.addOptions(['Jakarta', 'Bandung']);
     const radio = form.createRadioGroup('jenis');
@@ -194,7 +197,8 @@ describe('edit', () => {
     const locked = add(form.createTextField('nomor'), p2, 100);
     locked.setText('A-1');
     locked.enableReadOnly();
-    const src = await doc.save();
+    // Keep the auto size: saving with appearance updates would bake one in.
+    const src = await doc.save({ updateFieldAppearances: false });
 
     const fields = await ops.getFormFields(src);
     assert.deepEqual(
@@ -222,6 +226,10 @@ describe('edit', () => {
     assert.equal(after.nama, '');
     assert.equal(after.setuju, false);
     assert.equal(after.kota, '');
+
+    // Auto-sized multiline fields get a regular size instead of pdf-lib's oversized pick.
+    const da = (await PDFDocument.load(out)).getForm().getTextField('alamat').acroField.getDefaultAppearance();
+    assert.match(da ?? '', /\b12 Tf/);
 
     const flat = await ops.fillForm(src, { nama: 'Budi' }, { flatten: true });
     assert.equal((await ops.getInfo(flat)).hasForm, false);

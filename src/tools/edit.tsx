@@ -494,9 +494,10 @@ export function FillFormTool({ initial }: ToolProps) {
   );
 }
 
-/** "Page1.Data_Diri.nama_lengkap" reads as "nama lengkap". */
+/** "Page1.Data_Diri.nama_lengkap" reads as "Nama lengkap". */
 function fieldLabel(name: string) {
-  return (name.split('.').pop() ?? name).replace(/\[\d+\]$/, '').replace(/[_-]+/g, ' ').trim() || name;
+  const label = (name.split('.').pop() ?? name).replace(/\[\d+\]$/, '').replace(/[_-]+/g, ' ').trim() || name;
+  return label[0].toUpperCase() + label.slice(1);
 }
 
 function FormFiller({ source: s }: { source: PdfSource }) {
