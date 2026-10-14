@@ -1,10 +1,23 @@
-# Open PDF
+<p align="center">
+  <img src="assets/images/icon.png" alt="Open PDF icon" width="120">
+</p>
 
-A free PDF toolbox for your phone. Merge, split, compress, sign and protect PDFs without
-uploading them anywhere.
+<h1 align="center">Open PDF</h1>
+
+<p align="center">
+  A free PDF toolbox for your phone. Merge, split, compress, sign and protect PDFs without
+  uploading them anywhere.
+</p>
 
 **Everything happens on your device.** No account, no server, no ads. Your files never leave
 your phone.
+
+<p align="center">
+  <img src="docs/screenshots/files.png" alt="Files screen" width="23%">
+  <img src="docs/screenshots/tools.png" alt="Tools screen" width="23%">
+  <img src="docs/screenshots/viewer.png" alt="PDF viewer" width="23%">
+  <img src="docs/screenshots/settings.png" alt="Settings screen" width="23%">
+</p>
 
 ## Download
 
