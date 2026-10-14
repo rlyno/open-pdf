@@ -35,6 +35,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.openpdf.app",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
