@@ -35,7 +35,6 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.openpdf.app",
-      "versionCode": 1,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
@@ -108,6 +107,29 @@
     "platforms": [
       "ios",
       "android"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "expo-sharing-extension",
+                  "bundleIdentifier": "com.openpdf.app.expo-sharing-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.openpdf.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "4203a8b8-ba6c-4ec5-9401-6738a1c76b32"
+      }
+    }
   }
 }

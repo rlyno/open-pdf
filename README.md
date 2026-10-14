@@ -1,104 +1,70 @@
 # Open PDF
 
-Alat PDF lengkap untuk **Android & iOS**, terinspirasi dari [Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF).
-Bedanya: tidak perlu server. Semua proses berjalan **di perangkat**, jadi file tidak pernah di-upload ke mana pun.
+A free PDF toolbox for your phone. Merge, split, compress, sign and protect PDFs without
+uploading them anywhere.
 
-Dibangun dengan Expo (React Native + TypeScript), [`@cantoo/pdf-lib`](https://www.npmjs.com/package/@cantoo/pdf-lib)
-untuk manipulasi PDF, dan PDFKit (iOS) / PdfRenderer (Android) untuk render halaman lewat
-[`react-native-pdf-thumbnail`](https://www.npmjs.com/package/react-native-pdf-thumbnail).
+**Everything happens on your device.** No account, no server, no ads. Your files never leave
+your phone.
 
-## Fitur
+## Download
 
-| Kategori | Alat |
+**Android:** [Download the latest APK](https://github.com/rlyno/open-pdf/releases/latest)
+
+1. Open the link above and download the file ending in `.apk`.
+2. Open it on your phone. If Android asks, allow installing apps from your browser or file manager.
+3. Tap **Install**.
+
+An iOS version can be built from source (see below), but there is no App Store release yet.
+
+## What you can do
+
+| | |
 | --- | --- |
-| **Atur** | Gabung PDF · Pisah PDF (tiap N halaman / rentang) · Atur halaman (urutkan, ambil, ganjil/genap, balik) · Putar halaman · Hapus halaman · Multi-halaman (2/4 per lembar) |
-| **Konversi** | Gambar ke PDF (A4/Letter/sesuai gambar) · PDF ke gambar (JPEG/ZIP) · Kompres (lossless atau maksimal via rasterisasi) |
-| **Edit** | Watermark teks (tengah/ulang, warna, transparansi, kemiringan) · Nomor halaman · Tanda tangan (gambar dengan jari, atau dari foto/PNG) · Info & metadata · Ratakan formulir |
-| **Keamanan** | Tambah password (AES-256 + izin cetak/salin/ubah) · Hapus password |
+| **Organize** | Merge PDFs, split them, reorder, rotate or delete pages, put 2 or 4 pages on one sheet |
+| **Convert** | Turn images into a PDF, turn a PDF into images, compress large PDFs |
+| **Edit** | Add a watermark or page numbers, sign with your finger or a photo, view and edit document info, flatten forms |
+| **Security** | Add or remove a password (AES-256) |
 
-Hasil disimpan di tab **File**, dan bisa dibagikan atau disimpan ke folder (Android: pemilih folder; iOS: "Simpan ke File").
+You can also read PDFs in the built-in viewer (zoom, page thumbnails) and draw, highlight or add
+text on top of them. Your original file is never changed. Saving creates a new copy.
 
-Ketuk PDF di tab **File** untuk membukanya di **penampil**: halaman di-render tajam sesuai kebutuhan,
-ada penghitung halaman dan strip thumbnail untuk lompat halaman, ketuk halaman untuk memperbesar
-(cubit, geser, ketuk dua kali), dan bilah bawah untuk langsung membuka alat dengan dokumen itu.
+PDFs shared from other apps ("Share" or "Open with") open straight in Open PDF and suggest tools
+that fit.
 
-Tombol **Anotasi** di penampil membuka mode coret: pena, stabilo, teks, penghapus, plus urungkan/ulangi,
-palet warna, dan ketebalan. **Simpan** menempelkan anotasi secara permanen (vektor) ke file baru
-`…-anotasi.pdf`; file aslinya tidak diubah. Stabilo adalah coretan bebas, bukan seleksi teks.
+The app speaks English or Indonesian, depending on your phone's language.
 
-PDF dan gambar juga bisa dikirim dari aplikasi lain lewat menu **Bagikan**, atau dibuka dengan
-**"Buka dengan Open PDF"** (Android) / **"Buka di"** (iOS); aplikasi lalu menawarkan alat yang cocok.
+## Good to know
 
-Bahasa mengikuti perangkat: Indonesia untuk perangkat berbahasa Indonesia, selain itu Inggris.
-Teks UI ditulis dalam bahasa Indonesia dan diterjemahkan lewat `t()` di `src/lib/i18n.ts`;
-terjemahan Inggris ada di `src/lib/i18n-en.ts` (tes memastikan tidak ada yang terlewat).
+- Watermarks and page numbers support Latin letters only.
+- "Maximum" compression turns pages into pictures, so the text can no longer be selected.
+- No OCR or Word/Excel conversion yet.
+- Receiving files from other apps has been tested on Android, not yet on iOS.
 
-## Struktur
+## Build it yourself
 
-```
-src/
-  app/                 Rute Expo Router
-    (tabs)/index.tsx   Beranda File: status privasi, alat cepat, penyimpanan, dokumen terbaru
-    (tabs)/tools.tsx   Daftar semua alat per kategori
-    (tabs)/settings.tsx Tema, bahasa, penyimpanan, tentang
-    tool/[id].tsx      Membuka layar alat berdasarkan id
-    viewer.tsx         Penampil PDF (halaman, navigasi, zoom, alat cepat)
-    incoming.tsx       File yang dibagikan/dibuka dari aplikasi lain
-    +native-intent.ts  Mengarahkan link dari OS ke incoming
-  lib/
-    pdf/ops.ts         Semua operasi PDF (murni: bytes masuk, bytes keluar; tanpa React Native)
-    tools.ts           Daftar alat (judul, ikon, kategori)
-    files.ts           Pilih file/gambar, simpan, bagikan, impor file dari aplikasi lain
-    i18n.ts            Terjemahan (t()), kamus Inggris di i18n-en.ts
-    render.ts          Render halaman via mesin PDF native
-  tools/               Layar setiap alat (organize, convert, edit, security)
-  components/          Komponen UI bersama
-  hooks/use-tool.ts    State pilih PDF, jalankan alat, thumbnail
-tests/                 Tes engine PDF dan kelengkapan terjemahan (jalan di Node)
-```
-
-Menambah alat baru: tulis fungsinya di `src/lib/pdf/ops.ts` (+ tes), daftarkan di `src/lib/tools.ts`,
-buat layarnya di `src/tools/`, lalu petakan di `src/tools/index.ts`.
-
-## Menjalankan
-
-Aplikasi ini memakai modul native (render halaman), jadi butuh **development build**, bukan Expo Go.
+Open PDF is built with [Expo](https://expo.dev) (React Native). It uses native code, so Expo Go
+will not work. You need a development build.
 
 ```bash
 npm install
-npm test            # tes engine PDF
-npm run typecheck
-npx expo lint
-
-npx expo run:android   # butuh Android Studio / emulator
-npx expo run:ios       # butuh Xcode + iOS Simulator (macOS)
+npx expo run:android   # needs Android Studio
+npx expo run:ios       # needs Xcode (macOS)
 ```
 
-> **Android butuh JDK 17.** JDK 25 bawaan Android Studio terbaru membuat langkah CMake gagal
-> ("A restricted method in java.lang.System has been called"). Arahkan `JAVA_HOME` ke JDK 17 sebelum build.
+Android builds need JDK 17.
 
-`patches/` berisi patch kecil untuk `react-native-pdf-thumbnail` (diterapkan otomatis saat `npm install`)
-agar halaman bisa dirender di atas 72 dpi.
+Other useful commands: `npm test`, `npm run typecheck`, `npx expo lint`.
 
-Build di cloud tanpa Android Studio/Xcode lokal:
+## Contributing
 
-```bash
-npx eas-cli@latest build --profile development --platform all
-```
+Bug reports and pull requests are welcome. Please open an issue first for larger changes.
 
-## Batasan saat ini
-
-- Watermark dan nomor halaman memakai font standar PDF, jadi hanya mendukung huruf Latin.
-- Kompres "Maksimal" mengubah halaman menjadi gambar, sehingga teks tidak bisa dipilih lagi.
-- Belum ada: OCR dan konversi Office ↔ PDF.
-- Menerima file dari aplikasi lain sudah dites di Android; di iOS (share extension) belum dites.
-
-## Lisensi
+## License
 
 Copyright (C) 2026 Epafraditus Memoriano (RLYNO).
 
-Open PDF adalah perangkat lunak bebas di bawah [GNU General Public License v3.0](LICENSE).
-Kamu boleh memakai, mengubah, dan mendistribusikan ulang (termasuk menjualnya), asalkan versi yang
-didistribusikan juga dirilis dengan GPL-3.0 beserta kode sumbernya, dan mencantumkan karya asli ini.
+Open PDF is free software under the [GNU General Public License v3.0](LICENSE). You can use,
+change and share it, including selling it, as long as the version you distribute is also released
+under GPL-3.0 with its source code and credits the original work.
 
-Setiap PDF yang dihasilkan aplikasi ini memuat penanda `Producer: Open PDF by RLYNO` pada metadata.
+PDFs created by the app carry the metadata tag `Producer: Open PDF by RLYNO`.
